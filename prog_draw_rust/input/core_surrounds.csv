@@ -1,0 +1,10 @@
+Col_1,Col_2,Col_3,Col_4,Col_5,Value,Class
+Account Management,Administer Accounts,,,,Enact a status on accounts,Core
+Account Management,Administer Accounts,,,,Enact a status on transactions,Core
+Account Management,Administer Accounts,,,,Link overdraft protection,Core
+Account Management,Capital One Legal Entity,,,,Assign DDA Account to Legal Entity,Core
+Account Servicing,Capital One Legal Entity,,,,Assign Loan Account to Legal Entity,Core
+Account Servicing,,,,,Perform Year End Processing,Core
+Account Servicing,Calculate Balances,,,,Aggregate available balance within customer,Core
+Account Servicing,Calculate Balances,,,,Assign funds availability policy to accounts,Core
+Account Servicing,Calculate Balances,,,,Maintain daily balances,Core
