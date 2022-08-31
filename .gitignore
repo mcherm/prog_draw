@@ -1,2 +1,3 @@
 prog_draw_rust/output
 prog_draw_rust/target
+prog_draw_rust/input/export.csv

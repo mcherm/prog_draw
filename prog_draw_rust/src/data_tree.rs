@@ -6,7 +6,7 @@
 
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use super::svg_writer::{Renderable, TagWriter, Attributes, TagWriterError};
+use super::svg_writer::{Renderable, TagWriter, Attributes, TagWriterError, Context};
 use super::svg_render::SvgPositioned;
 use super::svg_render::geometry::{Coord, Rect};
 
@@ -148,18 +148,21 @@ impl<T> DTNode<T> {
 }
 
 impl<T: SvgPositioned> Renderable for DTNode<T> {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
+        // --- Use context to decide whether to draw to the right or the left ---
+        let leftward: bool = *context.get("layout_direction").unwrap_or(&"Right") == "Left";
+
         // --- Draw lines to child nodes ---
-        let parent_bbox = self.data.get_bbox();
-        let parent_line_end_x = parent_bbox.right();
+        let parent_bbox = self.data.get_bbox(context);
+        let parent_line_end_x = if leftward {parent_bbox.left()} else {parent_bbox.right()};
         let parent_line_end_y = parent_bbox.top() + parent_bbox.height() / 2.0;
-        let parent_line_ctrl_x = parent_line_end_x + LINE_CTRL_OFFSET;
+        let parent_line_ctrl_x = parent_line_end_x + LINE_CTRL_OFFSET * if leftward {-1.0} else {1.0};
         let parent_line_ctrl_y = parent_line_end_y;
         for child in self.children.iter() {
-            let child_bbox = child.data.get_bbox();
-            let child_line_end_x = child_bbox.left();
+            let child_bbox = child.data.get_bbox(context);
+            let child_line_end_x = if leftward {child_bbox.right()} else {child_bbox.left()};
             let child_line_end_y = child_bbox.top() + child_bbox.height() / 2.0;
-            let child_line_ctrl_x = child_line_end_x - LINE_CTRL_OFFSET;
+            let child_line_ctrl_x = child_line_end_x + LINE_CTRL_OFFSET * if leftward {1.0} else {-1.0};
             let child_line_ctrl_y = child_line_end_y;
             let path_code: String = format_args!(
                 "M {} {} C {} {}, {} {}, {} {}",
@@ -176,21 +179,20 @@ impl<T: SvgPositioned> Renderable for DTNode<T> {
         }
         // --- Draw child nodes ---
         for child in self.children.iter() {
-            child.render(tag_writer)?;
+            child.render(tag_writer, context)?;
         }
         // --- Draw this node ---
-        self.data.render(tag_writer)?;
+        self.data.render(tag_writer, context)?;
         Ok(())
     }
 }
 
 impl<T: SvgPositioned> SvgPositioned for DTNode<T> {
     // Returns the bbox that covers the root node AND all descendant nodes.
-    fn get_bbox(&self) -> Rect {
-        let root_rect: Rect = self.data.get_bbox();
+    fn get_bbox(&self, context: &mut Context) -> Rect {
+        let root_rect: Rect = self.data.get_bbox(context);
         self.children.iter()
-            .map(|child| child.get_bbox())
+            .map(|child| child.get_bbox(context))
             .fold(root_rect, |r1, r2| r1.cover(&r2))
     }
 }
-
