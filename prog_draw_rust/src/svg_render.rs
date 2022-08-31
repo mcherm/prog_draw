@@ -100,21 +100,30 @@ impl SvgPositioned for BasicBox {
 
 pub struct Group {
     pub items: Vec<Box<dyn SvgPositioned>>,
+    transform: Option<String>,
 }
 
 impl Group {
     pub fn new() -> Self {
-        Group{items: Vec::new()}
+        Group{items: Vec::new(), transform: None}
     }
 
     pub fn add(&mut self, item: Box<dyn SvgPositioned>) {
         self.items.push(item);
     }
+
+    pub fn set_transform(&mut self, transform: Option<String>) {
+        self.transform = transform;
+    }
 }
 
 impl Renderable for Group {
     fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
-        tag_writer.begin_tag("g", Attributes::new())?;
+        let attributes = match &self.transform {
+            None => Attributes::new(),
+            Some(transform) => Attributes::from([("transform", transform)]),
+        };
+        tag_writer.begin_tag("g", attributes)?;
         for item in self.items.iter() {
             item.render(tag_writer, context)?;
         }
@@ -140,7 +149,7 @@ impl<const N: usize> From<[Box<dyn SvgPositioned>; N]> for Group {
         for item in arr {
             items.push(item);
         }
-        Group{items}
+        Group{items, transform: None}
     }
 }
 

@@ -109,10 +109,16 @@ impl TagWriter {
         }
     }
 
-    /// Directly output text into the document. Rarely used.
+    /// Directly output body text into the document (escaping it first). Rarely used.
     #[allow(dead_code)] // Maybe even remove this if it isn't used!
     pub fn text(&mut self, text: &str) -> Result<(), TagWriterError> {
         write!(self.output, "{}", xml_escape_body_text(text))?;
+        Ok(())
+    }
+
+    /// Directly output SVG content into the document. Used in specialized cases only.
+    pub fn raw_svg(&mut self, svg: &str) -> Result<(), TagWriterError> {
+        write!(self.output, "{}", svg)?;
         Ok(())
     }
 

@@ -1,8 +1,5 @@
 
-
-const INPUT_FILENAME: &str = "input/core_surrounds.csv";
-const OUTPUT_FILENAME: &str = "output/core_surrounds.svg";
-
+mod trifoil;
 
 use std::fs::File;
 use std::collections::HashMap;
@@ -22,9 +19,14 @@ use super::text_size::text_size;
 use super::svg_render::geometry::{Coord, Rect};
 
 
-static TEXT_ITEM_PADDING: Coord = 2.0;
-static BASELINE_RISE: Coord = 2.0;
-static NODE_ITEM_ROUND_CORNER: Coord = 3.0;
+
+const INPUT_FILENAME: &str = "input/core_surrounds.csv";
+const OUTPUT_FILENAME: &str = "output/core_surrounds.svg";
+
+const TEXT_ITEM_PADDING: Coord = 2.0;
+const BASELINE_RISE: Coord = 2.0;
+const NODE_ITEM_ROUND_CORNER: Coord = 3.0;
+const CENTER_DOT_RADIUS: Coord = 16.0;
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -69,17 +71,17 @@ impl LobUsage {
         LobUsage{consumer: bools[0], sbb: bools[1], commercial: bools[2]}
     }
 
-    /// Return the color that should be used to render this.
-    pub fn get_color_str(&self) -> &'static str {
+    /// Return the (box_color, text_color) that should be used to render this.
+    pub fn get_color_str(&self) -> (&'static str, &'static str) {
         match (self.commercial, self.sbb, self.consumer) {
-            ( true,  true,  true) => "#ffffff",
-            ( true,  true, false) => "#ffff8c",
-            ( true, false,  true) => "#ff8cff",
-            ( true, false, false) => "#ff8c8c",
-            (false,  true,  true) => "#8cffff",
-            (false,  true, false) => "#ff8c8c",
-            (false, false,  true) => "#8c8cff",
-            (false, false, false) => "#8c8c8c",
+            ( true,  true,  true) => ("#6C686C", "#FFFFFF"),
+            ( true,  true, false) => ("#F58CFF", "#000000"),
+            ( true, false,  true) => ("#FFC77F", "#000000"),
+            ( true, false, false) => ("#FF6163", "#000000"),
+            (false,  true,  true) => ("#80FF80", "#000000"),
+            (false,  true, false) => ("#7F7FFF", "#000000"),
+            (false, false,  true) => ("#FFFF7F", "#000000"),
+            (false, false, false) => ("#FFFFFF", "#000000"),
         }
     }
 }
@@ -130,8 +132,8 @@ impl Renderable for MyNode {
             NodeLocationStyle::BranchNode => "branch",
             NodeLocationStyle::LeafNode => "leaf",
         };
-        let fill_color: &str = match self.lob_usage {
-            None => "#808080",
+        let (box_color, text_color) = match self.lob_usage {
+            None => ("#c0c0c0", "#000000"),
             Some(lob_usage) => lob_usage.get_color_str(),
         };
 
@@ -143,7 +145,7 @@ impl Renderable for MyNode {
                 ("width", &*box_width.to_string()),
                 ("height", &*box_height.to_string()),
                 ("rx", &*NODE_ITEM_ROUND_CORNER.to_string()),
-                ("fill", fill_color),
+                ("fill", box_color),
                 ("stroke", "black"),
                 ("stroke-width", &*1.to_string()),
                 ("class", class)
@@ -154,6 +156,7 @@ impl Renderable for MyNode {
                     ("x", &*text_left.to_string()),
                     ("y", &*text_baseline.to_string()),
                     ("font-family", "Arial"),
+                    ("fill", text_color),
                     ("style", "font-style: normal; font-size: 12.4px"), // FIXME: size for 14 and set this to 12.4 seems to work. WHY?
                     ("class", class),
                 ]),
@@ -229,13 +232,8 @@ impl MyNodeTree {
 impl Renderable for MyNodeTree {
     fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
         tag_writer.begin_tag("g", Attributes::new())?;
+        // FIXME: I used to have style here; don't need it now.
         let style_text = r#"
-            rect.branch {
-                fill: #c0c0c0;
-            }
-            text.branch {
-                fill: #000000;
-            }
         "#;
         tag_writer.tag_with_text("style", Attributes::new(), style_text)?;
         context.insert("layout_direction".to_string(), match self.layout_direction {
@@ -361,7 +359,6 @@ fn set_node_loc_style_internal(dtnode: &mut DTNode<MyNode>) {
 /// Returns the core tree and the surrounds tree
 fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
     static NUM_LEVEL_COLS: usize = 4;
-    static NAME_COL: usize = 4;
     static FEATURE_PLACEMENT_COL: usize = 5;
     static LOB_USAGE_COLS: [usize;3] = [6,7,8];
     static EMPTY_STRING: String = String::new();
@@ -388,9 +385,6 @@ fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
     for result in reader.records() {
         let record = result.unwrap();
 
-        // --- get the name of this leaf ---
-        let text = record.get(NAME_COL).unwrap();
-
         // --- get the lob_usage for this leaf ---
         let lob_usage_strs = [
             record.get(LOB_USAGE_COLS[0]).unwrap(),
@@ -412,10 +406,11 @@ fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
         };
 
         // --- find the node_names ---
-        let this_node_names: Vec<String> = (0..NUM_LEVEL_COLS)
+        let mut this_node_names: Vec<String> = (0..NUM_LEVEL_COLS)
             .map(|x| record.get(x).unwrap().to_string())
             .take_while(|x| x.len() > 0)
             .collect();
+        let item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
 
         // --- close out nodes as needed ---
         let mut depth;
@@ -440,6 +435,13 @@ fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
             }
         }
 
+        // --- double-check that previous nodes are the same ---
+        for deeper_depth in 0..depth {
+            let prev_name = fields.prev_node_names.get(deeper_depth).unwrap();
+            let this_name = this_node_names.get(deeper_depth).unwrap_or(&EMPTY_STRING);
+            assert_eq!(prev_name, this_name);
+        }
+
         // --- create new nodes as needed ---
         while depth < this_node_names.len() {
             let this_name = this_node_names.get(depth).unwrap();
@@ -449,7 +451,7 @@ fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
         }
 
         // --- add THIS node ---
-        fields.commands.push(AddData(MyNode::new(text, Some(lob_usage), &mut fields.id_source)));
+        fields.commands.push(AddData(MyNode::new(&item_text, Some(lob_usage), &mut fields.id_source)));
 
         // --- update prev_node_names ---
         fields.prev_node_names = this_node_names;
@@ -466,6 +468,49 @@ fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
 }
 
 
+struct CenterDot;
+
+impl Renderable for CenterDot {
+    fn render(&self, tag_writer: &mut TagWriter, _context: &mut Context) -> Result<(), TagWriterError> {
+        tag_writer.single_tag("circle", Attributes::from([
+            ("cx", "0"),
+            ("cy", "0"),
+            ("r", &*CENTER_DOT_RADIUS.to_string()),
+        ]))?;
+        Ok(())
+    }
+}
+
+impl SvgPositioned for CenterDot {
+    fn get_bbox(&self, _context: &mut Context) -> Rect {
+        Rect::new_cwh((0.0,0.0), 2.0 * CENTER_DOT_RADIUS, 2.0 * CENTER_DOT_RADIUS)
+    }
+}
+
+
+/// Function that places all the pieces that are highly specific to the diagram we
+/// are building.
+fn layout_this_diagram(core_tree: MyNodeTree, surround_tree: MyNodeTree) -> Svg<Group> {
+    let shift_dist = CENTER_DOT_RADIUS - 2.0 * TEXT_ITEM_PADDING;
+
+    let mut core_tree_group = Group::new();
+    core_tree_group.add(Box::new(core_tree));
+    core_tree_group.set_transform(Some(format!("translate({},0)", shift_dist * -1.0)));
+
+    let mut surround_tree_group = Group::new();
+    surround_tree_group.add(Box::new(surround_tree));
+    surround_tree_group.set_transform(Some(format!("translate({},0)", shift_dist)));
+
+    let content: [Box<dyn SvgPositioned>; 4] = [
+        Box::new(trifoil::Trifoil),
+        Box::new(core_tree_group),
+        Box::new(surround_tree_group),
+        Box::new(CenterDot),
+    ];
+    Svg::new(Group::from(content))
+}
+
+
 fn build_tidy_tree() -> Result<(),TagWriterError> {
     let [mut core_tree, mut surround_tree] = read_csv(INPUT_FILENAME)?;
 
@@ -473,8 +518,7 @@ fn build_tidy_tree() -> Result<(),TagWriterError> {
     surround_tree.layout();
 
     // Output it
-    let content: [Box<dyn SvgPositioned>; 2] = [Box::new(core_tree), Box::new(surround_tree)];
-    let svg = Svg::new(Group::from(content));
+    let svg = layout_this_diagram(core_tree, surround_tree);
     let output: File = File::create(OUTPUT_FILENAME)?;
     let mut tag_writer = TagWriter::new(output);
     svg.render(&mut tag_writer, &mut Context::default())?;
