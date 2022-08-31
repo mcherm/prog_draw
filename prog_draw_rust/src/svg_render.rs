@@ -108,10 +108,15 @@ impl Group {
         Group{items: Vec::new(), transform: None}
     }
 
+    pub fn item_transformed(item: Box<dyn SvgPositioned>, transform: &str) -> Self {
+        Group{items: vec![item], transform: Some(transform.to_string())}
+    }
+
     pub fn add(&mut self, item: Box<dyn SvgPositioned>) {
         self.items.push(item);
     }
 
+    #[allow(dead_code)] // FIXME: It isn't used yet.
     pub fn set_transform(&mut self, transform: Option<String>) {
         self.transform = transform;
     }

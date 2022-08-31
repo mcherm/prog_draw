@@ -133,7 +133,7 @@ impl Renderable for MyNode {
             NodeLocationStyle::LeafNode => "leaf",
         };
         let (box_color, text_color) = match self.lob_usage {
-            None => ("#c0c0c0", "#000000"),
+            None => ("#E8E8E8", "#000000"),
             Some(lob_usage) => lob_usage.get_color_str(),
         };
 
@@ -493,16 +493,12 @@ impl SvgPositioned for CenterDot {
 fn layout_this_diagram(core_tree: MyNodeTree, surround_tree: MyNodeTree) -> Svg<Group> {
     let shift_dist = CENTER_DOT_RADIUS - 2.0 * TEXT_ITEM_PADDING;
 
-    let mut core_tree_group = Group::new();
-    core_tree_group.add(Box::new(core_tree));
-    core_tree_group.set_transform(Some(format!("translate({},0)", shift_dist * -1.0)));
-
-    let mut surround_tree_group = Group::new();
-    surround_tree_group.add(Box::new(surround_tree));
-    surround_tree_group.set_transform(Some(format!("translate({},0)", shift_dist)));
+    let core_tree_group = Group::item_transformed(Box::new(core_tree), &format!("translate({},0)", shift_dist * -1.0));
+    let surround_tree_group = Group::item_transformed(Box::new(surround_tree), &format!("translate({},0)", shift_dist));
+    let trifoil_group = Group::item_transformed(Box::new(trifoil::Trifoil), "translate(0 -250) scale(0.5)");
 
     let content: [Box<dyn SvgPositioned>; 4] = [
-        Box::new(trifoil::Trifoil),
+        Box::new(trifoil_group),
         Box::new(core_tree_group),
         Box::new(surround_tree_group),
         Box::new(CenterDot),
