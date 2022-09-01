@@ -370,10 +370,11 @@ fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[MyNod
         commands: Vec<DTNodeBuild<MyNode>>,
         id_source: usize,
         prev_node_names: Vec<String>, // entry for each branch node
+        prev_item_text: String,
     }
     impl FieldsTrackedPerTree {
         fn new() -> Self {
-            FieldsTrackedPerTree{commands: Vec::new(), id_source: 1, prev_node_names: Vec::new()}
+            FieldsTrackedPerTree{commands: Vec::new(), id_source: 1, prev_node_names: Vec::new(), prev_item_text: String::new()}
         }
     }
 
@@ -422,11 +423,15 @@ fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[MyNod
             let mut item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
 
             // --- If part of it is folded, adjust accordingly ---
+            let mut is_new_node = true; // only in special circumstances is it NOT a new node.
             if let Some(fold_position) = fold_info.get_fold_position(&this_node_names) {
                 assert!(fold_position < this_node_names.len()); // should always be true
                 item_text = this_node_names.get(fold_position).unwrap().clone();
                 this_node_names.truncate(fold_position);
-                // FIXME: Later I need to make sure I don't add the same item multiple times. But only after I merge branches
+                if this_node_names == fields.prev_node_names && item_text == fields.prev_item_text {
+                    // because of folding, we're encountering a repeat. It's not a new node.
+                    is_new_node = false;
+                }
             }
 
             // --- close out nodes as needed ---
@@ -468,10 +473,25 @@ fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[MyNod
             }
 
             // --- add THIS node ---
-            fields.commands.push(AddData(MyNode::new(&item_text, Some(lob_usage), &mut fields.id_source)));
+            if is_new_node {
+                fields.commands.push(AddData(MyNode::new(&item_text, Some(lob_usage), &mut fields.id_source)));
+            } else {
+                // special case: we just want to update the LOB usage because the node already exists.
+                let last_command = fields.commands.last_mut().unwrap();
+                if let AddData(MyNode{lob_usage: Some(existing_lob_usage), ..}) = last_command {
+                    // If EITHER the existing node OR the new one is used by this LOB, mark it as in use
+                    existing_lob_usage.consumer |= lob_usage.consumer;
+                    existing_lob_usage.sbb |= lob_usage.sbb;
+                    existing_lob_usage.commercial |= lob_usage.commercial;
+                    // FIXME: This takes into account immediate children but (I think) not all descendents
+                } else {
+                    panic!("The previous command ought to be AddData() with an lob_usage");
+                }
+            }
 
             // --- update prev_node_names ---
             fields.prev_node_names = this_node_names;
+            fields.prev_item_text = item_text;
         }
     }
 

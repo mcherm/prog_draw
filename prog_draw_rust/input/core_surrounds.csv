@@ -12,8 +12,8 @@ Account Servicing,Calculate Balances,Maintain daily balances,,,,,Core,,No,Yes,No
 Account Management,Administer Accounts,Enact a status on accounts,,,,,Surround,,Yes,Yes,Yes
 Account Management,Administer Accounts,Enact a status on transactions,,,,,Surround,,No,Yes,Yes
 Account Management,Administer Accounts,Link overdraft protection,,,,,Surround,,No,No,Yes
-Account Management,Capital One Legal Entity,Assign DDA Account to Legal Entity,,,,,Surround,,Yes,Yes,Yes
-Account Management,Capital One Legal Entity,Assign Loan Account to Legal Entity,,,,,Surround,,Yes,Yes,No
+Account Management,Capital One Legal Entity,Assign DDA Account to Legal Entity,,,,,Surround,,Yes,No,No
+Account Management,Capital One Legal Entity,Assign Loan Account to Legal Entity,,,,,Surround,,No,Yes,No
 Account Servicing,Perform Year End Processing,,,,,,Surround,,Yes,No,Yes
 Account Servicing,Calculate Balances,Aggregate available balance within customer,,,,,Surround,,No,Yes,Yes
 Account Servicing,Calculate Balances,Assign funds availability policy to accounts,,,,,Surround,,Yes,No,No
