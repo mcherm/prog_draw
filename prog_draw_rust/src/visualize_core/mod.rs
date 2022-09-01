@@ -1,4 +1,3 @@
-
 mod trifoil;
 
 use std::fs::File;
@@ -358,9 +357,9 @@ fn set_node_loc_style_internal(dtnode: &mut DTNode<MyNode>) {
 // FIXME: This panics if the format isn't as expected. Should be made more robust.
 /// Returns the core tree and the surrounds tree
 fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
-    static NUM_LEVEL_COLS: usize = 4;
-    static FEATURE_PLACEMENT_COL: usize = 5;
-    static LOB_USAGE_COLS: [usize;3] = [6,7,8];
+    const LEVEL_COLS: [usize; 5] = [0,1,2,3,4];
+    const FEATURE_PLACEMENT_COL: usize = 7;
+    const LOB_USAGE_COLS: [usize;3] = [9,10,11];
     static EMPTY_STRING: String = String::new();
 
     // --- Variables we will track from row to row ---
@@ -386,75 +385,84 @@ fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
         let record = result.unwrap();
 
         // --- get the lob_usage for this leaf ---
-        let lob_usage_strs = [
-            record.get(LOB_USAGE_COLS[0]).unwrap(),
-            record.get(LOB_USAGE_COLS[1]).unwrap(),
-            record.get(LOB_USAGE_COLS[2]).unwrap(),
-        ];
-        let lob_usage_bools: [bool; 3] = [
-            match lob_usage_strs[0] { "Yes" => true, "Maybe" => true, "" => true, "No" => false, _ => panic!("Bad value")},
-            match lob_usage_strs[1] { "Yes" => true, "Maybe" => true, "" => true, "No" => false, _ => panic!("Bad value")},
-            match lob_usage_strs[2] { "Yes" => true, "Maybe" => true, "" => true, "No" => false, _ => panic!("Bad value")},
-        ];
+        let get_lob_usage = |i: usize| {
+            let s = record.get(LOB_USAGE_COLS[i])
+                .unwrap_or_else(|| panic!("Column {} missing for row {:?}", LOB_USAGE_COLS[0], record));
+            match s {
+                "Yes" => true,
+                "Maybe" => true,
+                "" => true,
+                "No" => false,
+                _ => panic!("Invalid LOB usage '{}' in row {:?}", s, record)
+            }
+        };
+        let lob_usage_bools: [bool; 3] = [get_lob_usage(0), get_lob_usage(1), get_lob_usage(2)];
         let lob_usage = LobUsage::new(lob_usage_bools);
 
         // --- find which tree this leaf is on ---
-        let mut fields = match record.get(FEATURE_PLACEMENT_COL).unwrap() {
-            "Core" => &mut fields_core,
-            "Surround" => &mut fields_surround,
-            _ => panic!("Invalid feature placement"),
+        let feature_placement = record.get(FEATURE_PLACEMENT_COL).unwrap();
+        let places_to_display = match feature_placement {
+            "Core"     => vec![&mut fields_core],
+            "Surround" => vec![&mut fields_surround],
+            "Not Sure" => vec![&mut fields_core, &mut fields_surround],
+            ""         => vec![&mut fields_core, &mut fields_surround],
+            _ => panic!("Invalid feature placement of '{}' in row {:?}", feature_placement, record),
         };
 
-        // --- find the node_names ---
-        let mut this_node_names: Vec<String> = (0..NUM_LEVEL_COLS)
-            .map(|x| record.get(x).unwrap().to_string())
-            .take_while(|x| x.len() > 0)
-            .collect();
-        let item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
+        // --- Loop through the places we might display this (could be in core, surround, or both) ---
+        for fields in places_to_display {
 
-        // --- close out nodes as needed ---
-        let mut depth;
-        if fields.prev_node_names.len() == 0 {
-            depth = 0;
-        } else {
-            depth = fields.prev_node_names.len() - 1;
-            loop {
-                let prev_name = fields.prev_node_names.get(depth).unwrap();
-                let this_name = this_node_names.get(depth).unwrap_or(&EMPTY_STRING);
-                if prev_name == this_name {
-                    depth += 1;
-                    break; // we can exit the loop; we found an identical ancestor node
-                } else {
-                    fields.commands.push(EndChildren); // they're different, close out that depth
-                }
-                if depth == 0 {
-                    break;
-                } else {
-                    depth -= 1;
+            // --- find the node_names ---
+            let mut this_node_names: Vec<String> = LEVEL_COLS.iter()
+                .map(|x| record.get(*x).unwrap().to_string())
+                .take_while(|x| x.len() > 0)
+                .collect();
+            let item_text = this_node_names.pop().expect(&format!("Inconsistent name in {:?}", record)); // the last one isn't a node name, it's the item
+
+            // --- close out nodes as needed ---
+            let mut depth;
+            if fields.prev_node_names.len() == 0 {
+                depth = 0;
+            } else {
+                depth = fields.prev_node_names.len() - 1;
+                loop {
+                    let prev_name = fields.prev_node_names.get(depth).unwrap();
+                    let this_name = this_node_names.get(depth).unwrap_or(&EMPTY_STRING);
+                    if prev_name == this_name {
+                        depth += 1;
+                        break; // we can exit the loop; we found an identical ancestor node
+                    } else {
+                        fields.commands.push(EndChildren); // they're different, close out that depth
+                    }
+                    if depth == 0 {
+                        break;
+                    } else {
+                        depth -= 1;
+                    }
                 }
             }
+
+            // --- double-check that previous nodes are the same ---
+            for deeper_depth in 0..depth {
+                let prev_name = fields.prev_node_names.get(deeper_depth).unwrap();
+                let this_name = this_node_names.get(deeper_depth).unwrap_or(&EMPTY_STRING);
+                assert_eq!(prev_name, this_name);
+            }
+
+            // --- create new nodes as needed ---
+            while depth < this_node_names.len() {
+                let this_name = this_node_names.get(depth).unwrap();
+                fields.commands.push(AddData(MyNode::new(this_name, None, &mut fields.id_source)));
+                fields.commands.push(StartChildren);
+                depth += 1;
+            }
+
+            // --- add THIS node ---
+            fields.commands.push(AddData(MyNode::new(&item_text, Some(lob_usage), &mut fields.id_source)));
+
+            // --- update prev_node_names ---
+            fields.prev_node_names = this_node_names;
         }
-
-        // --- double-check that previous nodes are the same ---
-        for deeper_depth in 0..depth {
-            let prev_name = fields.prev_node_names.get(deeper_depth).unwrap();
-            let this_name = this_node_names.get(deeper_depth).unwrap_or(&EMPTY_STRING);
-            assert_eq!(prev_name, this_name);
-        }
-
-        // --- create new nodes as needed ---
-        while depth < this_node_names.len() {
-            let this_name = this_node_names.get(depth).unwrap();
-            fields.commands.push(AddData(MyNode::new(this_name, None, &mut fields.id_source)));
-            fields.commands.push(StartChildren);
-            depth += 1;
-        }
-
-        // --- add THIS node ---
-        fields.commands.push(AddData(MyNode::new(&item_text, Some(lob_usage), &mut fields.id_source)));
-
-        // --- update prev_node_names ---
-        fields.prev_node_names = this_node_names;
     }
 
     // --- Create a tree from the commands ---
