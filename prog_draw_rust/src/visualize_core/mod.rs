@@ -1,5 +1,6 @@
 
 mod trifoil;
+mod fold_up;
 
 use std::fs::File;
 use std::collections::HashMap;
@@ -21,6 +22,7 @@ use super::svg_render::geometry::{Coord, Rect};
 
 
 const INPUT_FILENAME: &str = "input/core_surrounds.csv";
+const FOLD_UP_FILENAME: &str = "input/fold_up.csv";
 const OUTPUT_FILENAME: &str = "output/core_surrounds.svg";
 
 const TEXT_ITEM_PADDING: Coord = 2.0;
@@ -30,27 +32,27 @@ const CENTER_DOT_RADIUS: Coord = 16.0;
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-enum TreeLayoutDirection {
+pub enum TreeLayoutDirection {
     Right,
     Left
 }
 
 #[derive(Debug, Eq, PartialEq)]
-enum NodeLocationStyle {
+pub enum NodeLocationStyle {
     RootNode,
     BranchNode,
     LeafNode,
 }
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-struct LobUsage {
+pub struct LobUsage {
     consumer: bool,
     sbb: bool,
     commercial: bool,
 }
 
 #[derive(Debug)]
-struct MyNode {
+pub struct MyNode {
     id: usize,
     text: String,
     lob_usage: Option<LobUsage>,
@@ -58,7 +60,7 @@ struct MyNode {
     node_loc_style: NodeLocationStyle,
 }
 
-struct MyNodeTree {
+pub struct MyNodeTree {
     tree: DTNode<MyNode>,
     layout_direction: TreeLayoutDirection,
 }
@@ -357,7 +359,7 @@ fn set_node_loc_style_internal(dtnode: &mut DTNode<MyNode>) {
 
 // FIXME: This panics if the format isn't as expected. Should be made more robust.
 /// Returns the core tree and the surrounds tree
-fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
+fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[MyNodeTree; 2], std::io::Error> {
     static NUM_LEVEL_COLS: usize = 4;
     static FEATURE_PLACEMENT_COL: usize = 5;
     static LOB_USAGE_COLS: [usize;3] = [6,7,8];
@@ -410,7 +412,15 @@ fn read_csv(input_filename: &str) -> Result<[MyNodeTree; 2], std::io::Error> {
             .map(|x| record.get(x).unwrap().to_string())
             .take_while(|x| x.len() > 0)
             .collect();
-        let item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
+        let mut item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
+
+        // --- If part of it is folded, adjust accordingly ---
+        if let Some(fold_position) = fold_info.get_fold_position(&this_node_names) {
+            assert!(fold_position < this_node_names.len()); // should always be true
+            item_text = this_node_names.get(fold_position).unwrap().clone();
+            this_node_names.truncate(fold_position);
+            // FIXME: Later I need to make sure I don't add the same item multiple times. But only after I merge branches
+        }
 
         // --- close out nodes as needed ---
         let mut depth;
@@ -508,12 +518,17 @@ fn layout_this_diagram(core_tree: MyNodeTree, surround_tree: MyNodeTree) -> Svg<
 
 
 fn build_tidy_tree() -> Result<(),TagWriterError> {
-    let [mut core_tree, mut surround_tree] = read_csv(INPUT_FILENAME)?;
+    // --- Read in the file saying what to ignore due to folding ---
+    let fold_info = fold_up::read_fold_info(FOLD_UP_FILENAME)?;
 
+    // --- read the nodes ---
+    let [mut core_tree, mut surround_tree] = read_csv(INPUT_FILENAME, fold_info)?;
+
+    // --- perform layout ---
     core_tree.layout();
     surround_tree.layout();
 
-    // Output it
+    // -- Output it ---
     let svg = layout_this_diagram(core_tree, surround_tree);
     let output: File = File::create(OUTPUT_FILENAME)?;
     let mut tag_writer = TagWriter::new(output);
