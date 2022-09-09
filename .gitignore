@@ -1,3 +1,6 @@
 prog_draw_rust/output
 prog_draw_rust/target
 prog_draw_rust/input/export.csv
+wasm_test/Cargo.lock
+wasm_test/target
+wasm_test/pkg
