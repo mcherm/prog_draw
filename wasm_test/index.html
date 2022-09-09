@@ -5,11 +5,12 @@
         <title>hello-wasm example</title>
     </head>
     <body>
+        <div id="svg_container"></div>
         <script type="module">
-            import init, {greet} from "./pkg/hello_wasm.js";
+            import init, {greet, get_svg} from "./pkg/hello_wasm.js";
             init()
                 .then(() => {
-                    greet("WebAssembly")
+                    document.getElementById("svg_container").innerHTML = get_svg();
                 });
         </script>
     </body>
