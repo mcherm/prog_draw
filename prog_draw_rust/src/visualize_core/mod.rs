@@ -8,23 +8,22 @@ mod document;
 use std::fs::File;
 use std;
 use super::svg_writer::TagWriterError;
-use capability_tree::read_csv;
+use capability_tree::read_csv_from_str;
 
 
 
-const INPUT_FILENAME: &str = "input/core_surrounds.csv";
-const FOLD_UP_FILENAME: &str = "input/fold_up.csv";
 const OUTPUT_FILENAME: &str = "output/core_surrounds.svg";
+
 
 
 /// Build and render the view that shows two trees (for core and surrounds) somewhat folded
 /// and neatly laid out with a key to the colors.
 fn build_two_tree_view() -> Result<(),TagWriterError> {
     // --- Read in the file saying what to ignore due to folding ---
-    let fold_info = fold_up::read_fold_info(FOLD_UP_FILENAME)?;
+    let fold_info = fold_up::read_fold_info_from_str(include_str!("../../input/fold_up.csv"))?;
 
     // --- read the nodes ---
-    let [core_tree, surround_tree] = read_csv(INPUT_FILENAME, fold_info)?;
+    let [core_tree, surround_tree] = read_csv_from_str(include_str!("../../input/core_surrounds.csv"), fold_info)?;
 
     // --- Create the document ---
     let two_tree_view = document::TwoTreeViewDocument::new(core_tree, surround_tree);

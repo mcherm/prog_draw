@@ -24,12 +24,9 @@ impl FoldInfo {
 }
 
 
-
-pub fn read_fold_info(filename: &str) -> Result<FoldInfo, io::Error> {
+pub fn read_fold_info_from_reader<R: std::io::Read>(reader: &mut csv::Reader<R>) -> Result<FoldInfo, io::Error> {
     let mut fold_paths = Vec::new();
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(false)
-        .from_path(filename)?;
+
     for result in reader.records() {
         let record = result.unwrap();
         let mut fold_path: Vec<String> = Vec::new();
@@ -45,6 +42,20 @@ pub fn read_fold_info(filename: &str) -> Result<FoldInfo, io::Error> {
         }
     }
 
-
     Ok(FoldInfo{fold_paths})
+}
+
+pub fn read_fold_info_from_str(data: &str) -> Result<FoldInfo, io::Error> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_reader(data.as_bytes());
+    read_fold_info_from_reader(&mut reader)
+}
+
+#[allow(dead_code)]
+pub fn read_fold_info_from_file(filename: &str) -> Result<FoldInfo, io::Error> {
+    let mut reader = csv::ReaderBuilder::new()
+        .has_headers(false)
+        .from_path(filename)?;
+    read_fold_info_from_reader(&mut reader)
 }

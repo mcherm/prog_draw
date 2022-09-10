@@ -365,9 +365,26 @@ fn set_node_loc_style_internal(dtnode: &mut DTNode<CapabilityNode>) {
 }
 
 
-// FIXME: This panics if the format isn't as expected. Should be made more robust.
+/// Returns the core tree and the surrounds tree, from an input file that's been included at
+/// compile time.
+pub fn read_csv_from_str(data: &str, fold_info: fold_up::FoldInfo) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
+    let mut reader = csv::ReaderBuilder::new().from_reader(data.as_bytes());
+    read_csv_from_reader(&mut reader, fold_info)
+}
+
+
+/// Returns the core tree and the surrounds tree from data in the input file specified.
+#[allow(dead_code)]
+pub fn read_csv_from_file(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
+    let mut reader = csv::Reader::from_path(input_filename)?;
+    read_csv_from_reader(&mut reader, fold_info)
+}
+
+
 /// Returns the core tree and the surrounds tree
-pub fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
+///
+/// FIXME: This panics if the format isn't as expected. Should be made more robust.
+pub fn read_csv_from_reader<R: std::io::Read>(reader: &mut csv::Reader<R>, fold_info: fold_up::FoldInfo) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
     const LEVEL_COLS: [usize; 5] = [0,1,2,3,4];
     const FEATURE_PLACEMENT_COL: usize = 7;
     const LOB_USAGE_COLS: [usize;3] = [9,10,11];
@@ -392,7 +409,6 @@ pub fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[C
     let mut fields_surround = FieldsTrackedPerTree::new();
 
     // --- Start reading the CSV ---
-    let mut reader = csv::Reader::from_path(input_filename)?;
     for result in reader.records() {
         let record = result.unwrap();
 
