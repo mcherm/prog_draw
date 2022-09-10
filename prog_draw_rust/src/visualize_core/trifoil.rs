@@ -5,7 +5,7 @@ use super::super::svg_render::{SvgPositioned};
 pub struct Trifoil;
 
 impl Renderable for Trifoil {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         tag_writer.raw_svg(TRIFOIL_SVG)
     }
 }

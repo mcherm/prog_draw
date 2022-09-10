@@ -1,6 +1,5 @@
-use std::fs::File;
+
 use std::fmt;
-use std::io::Write;
 use std::error::Error;
 
 
@@ -38,7 +37,7 @@ impl Attributes {
         Attributes { fields: Vec::new() }
     }
 
-    fn write(&self, output: &mut File) -> Result<(), TagWriterError> {
+    fn write(&self, output: &mut dyn std::io::Write) -> Result<(), TagWriterError> {
         for (key, val) in &self.fields {
             // FIXME: For now, this lacks proper escaping for field values
             write!(*output, " {}=\"{}\"", key, val)?;
@@ -64,10 +63,21 @@ impl<K, V, const N: usize> From<[(K, V); N]> for Attributes
 
 
 
-pub struct TagWriter {
-    output: File, // FIXME: Should be more generic like std::io::Write, but I'm not yet skilled enough to do that
+pub struct TagWriterImpl<'a> {
+    output: &'a mut dyn std::io::Write,
     indent_level: usize,
     indent_str: String,
+}
+
+
+pub trait TagWriter {
+    fn begin_tag(&mut self, tag: &str, attr: Attributes) -> Result<(), TagWriterError>;
+    fn end_tag(&mut self, tag: &str) -> Result<(), TagWriterError>;
+    fn text(&mut self, text: &str) -> Result<(), TagWriterError>;
+    fn raw_svg(&mut self, svg: &str) -> Result<(), TagWriterError>;
+    fn single_tag(&mut self, tag: &str, attr: Attributes) -> Result<(), TagWriterError>;
+    fn tag_with_text(&mut self, tag: &str, attr: Attributes, text: &str) -> Result<(), TagWriterError>;
+    fn close(&mut self) -> Result<(), TagWriterError>;
 }
 
 
@@ -80,26 +90,31 @@ pub fn xml_escape_body_text(s: &str) -> String {
 }
 
 
-impl TagWriter {
-    pub fn new(output: File) -> TagWriter {
-        TagWriter{output, indent_level: 0, indent_str: "  ".to_string()}
+impl<'a> TagWriterImpl<'a> {
+    pub fn new(output: &'a mut dyn std::io::Write) -> Self {
+        Self{output, indent_level: 0, indent_str: "  ".to_string()}
     }
 
     fn i_space(&self) -> String {
         self.indent_str.repeat(self.indent_level)
     }
 
+}
+
+
+impl<'a> TagWriter for TagWriterImpl<'a> {
+
     /// Begin a tag; all content will be on the next line and will be indented.
-    pub fn begin_tag(&mut self, tag: &str, attr: Attributes) -> Result<(), TagWriterError> {
+    fn begin_tag(&mut self, tag: &str, attr: Attributes) -> Result<(), TagWriterError> {
         write!(self.output, "{}<{}", self.i_space(), tag)?;
-        attr.write(&mut self.output)?;
+        attr.write(self.output)?;
         write!(self.output, ">\n")?;
         self.indent_level += 1;
         Ok(())
     }
 
     /// End a tag begun with begin_tag().
-    pub fn end_tag(&mut self, tag: &str) -> Result<(), TagWriterError> {
+    fn end_tag(&mut self, tag: &str) -> Result<(), TagWriterError> {
         if self.indent_level == 0 {
             Err(TagWriterError::NotEnoughBeginTags)
         } else {
@@ -110,35 +125,35 @@ impl TagWriter {
 
     /// Directly output body text into the document (escaping it first). Rarely used.
     #[allow(dead_code)] // Maybe even remove this if it isn't used!
-    pub fn text(&mut self, text: &str) -> Result<(), TagWriterError> {
+    fn text(&mut self, text: &str) -> Result<(), TagWriterError> {
         write!(self.output, "{}", xml_escape_body_text(text))?;
         Ok(())
     }
 
     /// Directly output SVG content into the document. Used in specialized cases only.
-    pub fn raw_svg(&mut self, svg: &str) -> Result<(), TagWriterError> {
+    fn raw_svg(&mut self, svg: &str) -> Result<(), TagWriterError> {
         write!(self.output, "{}", svg)?;
         Ok(())
     }
 
     /// Generate a single-line tag without separate begin/end tags.
-    pub fn single_tag(&mut self, tag: &str, attr: Attributes) -> Result<(), TagWriterError> {
+    fn single_tag(&mut self, tag: &str, attr: Attributes) -> Result<(), TagWriterError> {
         write!(self.output, "{}<{}", self.i_space(), tag)?;
-        attr.write(&mut self.output)?;
+        attr.write(self.output)?;
         write!(self.output, "/>\n")?;
         Ok(())
     }
 
     /// Creates a single-line tag with text inside the tag.
-    pub fn tag_with_text(&mut self, tag: &str, attr: Attributes, text: &str) -> Result<(), TagWriterError> {
+    fn tag_with_text(&mut self, tag: &str, attr: Attributes, text: &str) -> Result<(), TagWriterError> {
         write!(self.output, "{}<{}", self.i_space(), tag)?;
-        attr.write(&mut self.output)?;
+        attr.write(self.output)?;
         write!(self.output, ">{}</{}>\n", xml_escape_body_text(text), tag)?;
         Ok(())
     }
 
     /// Complete the SVG document. Will return an error if there are any unclosed tags.
-    pub fn close(&mut self) -> Result<(), TagWriterError> {
+    fn close(&mut self) -> Result<(), TagWriterError> {
         if self.indent_level > 0 {
             Err(TagWriterError::NotEnoughEndTags)
         } else {
@@ -150,5 +165,5 @@ impl TagWriter {
 
 /// A trait for anything which can be rendered to SVG.
 pub trait Renderable {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError>;
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError>;
 }

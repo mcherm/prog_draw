@@ -2,17 +2,19 @@
 use std::collections::HashMap;
 use std::cell::Cell;
 use itertools::Itertools;
-use super::super::data_tree::{DTNode, DTNodeBuild, InvalidGrowth, TreeLayoutDirection, LAYOUT_DIRECTION, DTNodeBuild::{AddData, EndChildren, StartChildren}};
-use super::super::svg_render::{SvgPositioned, geometry::{Coord, Rect}};
+use crate::visualize_core::document::{BASELINE_RISE, COLLAPSE_DOT_RADIUS, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
+use super::super::data_tree::{DTNode, DTNodeBuild, DTNodeBuild::{AddData, EndChildren, StartChildren}, InvalidGrowth, LAYOUT_DIRECTION, TreeLayoutDirection};
+use super::super::svg_render::{geometry::{Coord, Rect}, SvgPositioned};
 use super::super::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
 use super::super::text_size::text_size;
 use super::super::tidy_tree::{NULL_ID, TidyTree};
-use super::lob_usage::{LobUsage, get_color_strs};
-use super::{BASELINE_RISE, fold_up, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING, COLLAPSE_DOT_RADIUS};
+use super::lob_usage::{get_color_strs, LobUsage};
+use super::fold_up;
 
 
 
 #[derive(Debug, Eq, PartialEq)]
+#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub enum NodeLocationStyle {
     RootNode,
     BranchNode,
@@ -20,6 +22,7 @@ pub enum NodeLocationStyle {
 }
 
 #[derive(Debug)]
+#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub struct CapabilityNode {
     id: usize,
     text: String,
@@ -29,6 +32,7 @@ pub struct CapabilityNode {
     node_loc_style: NodeLocationStyle,
 }
 
+#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub struct CapabilityNodeTree {
     tree: DTNode<CapabilityNode>,
     layout_direction: TreeLayoutDirection,
@@ -75,7 +79,7 @@ impl CapabilityNode {
 
 
 impl Renderable for CapabilityNode {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         // --- Decide the dimensions of everything ---
         let (loc_x, loc_y) = self.location;
         let (text_width, text_height) = self.text_size();
@@ -234,7 +238,7 @@ impl CapabilityNodeTree {
 }
 
 impl Renderable for CapabilityNodeTree {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         tag_writer.begin_tag("g", Attributes::new())?;
         let style_text = r#"
           text.leaf {

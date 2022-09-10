@@ -1,12 +1,12 @@
 use super::super::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
 use super::super::svg_render::{SvgPositioned, geometry::Rect};
-use super::CENTER_DOT_RADIUS;
+use crate::visualize_core::document::CENTER_DOT_RADIUS;
 
 
 pub struct CenterDot;
 
 impl Renderable for CenterDot {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         tag_writer.single_tag("circle", Attributes::from([
             ("cx", "0"),
             ("cy", "0"),

@@ -1,5 +1,5 @@
 
-use crate::svg_writer::{Renderable, TagWriter, TagWriterError, Attributes};
+use crate::svg_writer::{Renderable, TagWriterImpl, TagWriter, TagWriterError, Attributes};
 use std::fs::File;
 use geometry::{Coord, Rect};
 
@@ -77,7 +77,7 @@ pub struct BasicBox {
 }
 
 impl Renderable for BasicBox {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         tag_writer.single_tag("rect", Attributes::from([
             ("x", self.x.to_string()),
             ("y", self.y.to_string()),
@@ -123,7 +123,7 @@ impl Group {
 }
 
 impl Renderable for Group {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         let attributes = match &self.transform {
             None => Attributes::new(),
             Some(transform) => Attributes::from([("transform", transform)]),
@@ -160,19 +160,19 @@ impl<const N: usize> From<[Box<dyn SvgPositioned>; N]> for Group {
 
 
 
-pub struct Svg<T: Renderable> {
-    content: T,
+pub struct Svg {
+    content: Group,
     margin: Coord,
 }
 
-impl<T: Renderable> Svg<T> {
-    pub fn new(content: T, margin: Coord) -> Self {
+impl Svg {
+    pub fn new(content: Group, margin: Coord) -> Self {
         Svg{content, margin}
     }
 }
 
-impl<T: SvgPositioned> Svg<T> {
-    pub fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+impl Renderable for Svg {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         let bbox = self.content.get_bbox();
         let viewbox: String = format_args!(
             "{} {} {} {}",
@@ -204,8 +204,8 @@ fn run() -> Result<(),TagWriterError> {
     group.add(Box::new(box_2));
     let svg = Svg{content: group, margin: 0.0};
 
-    let output2: File = File::create("output/test.svg")?;
-    let mut tag_writer = TagWriter::new(output2);
+    let mut output2: File = File::create("output/test.svg")?;
+    let mut tag_writer: TagWriterImpl = TagWriterImpl::new(&mut output2);
     svg.render(&mut tag_writer)?;
     tag_writer.close()?;
 

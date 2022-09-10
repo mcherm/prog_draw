@@ -15,6 +15,7 @@ use super::svg_render::geometry::{Coord, Rect};
 static LINE_CTRL_OFFSET: Coord = 10.0;
 
 
+#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub struct DTNode<T> {
     pub data: T,
     pub collapsed: bool,
@@ -167,7 +168,7 @@ impl<T> DTNode<T> {
 }
 
 impl<T: SvgPositioned> Renderable for DTNode<T> {
-    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         if !self.collapsed {
             // --- Use context to decide whether to draw to the right or the left ---
             let leftward: bool = match LAYOUT_DIRECTION.with(|it| it.get()) {
