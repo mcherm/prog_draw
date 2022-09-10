@@ -7,7 +7,10 @@
     <body>
         <div id="svg_container"></div>
         <script type="module">
-            import init, {greet, get_svg} from "./pkg/hello_wasm.js";
+            import init, {get_svg, toggle_node} from "./pkg/hello_wasm.js";
+            window.toggle_then_draw = function(id) {
+                document.getElementById("svg_container").innerHTML = toggle_node(id);
+            };
             init()
                 .then(() => {
                     document.getElementById("svg_container").innerHTML = get_svg();
