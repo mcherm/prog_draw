@@ -1,5 +1,6 @@
 
 use std::collections::HashMap;
+use std::cell::Cell;
 use itertools::Itertools;
 use super::super::data_tree::{DTNode, DTNodeBuild, InvalidGrowth, TreeLayoutDirection, LAYOUT_DIRECTION, DTNodeBuild::{AddData, EndChildren, StartChildren}};
 use super::super::svg_render::{SvgPositioned, geometry::{Coord, Rect}};
@@ -23,6 +24,7 @@ pub struct CapabilityNode {
     id: usize,
     text: String,
     lob_usage: Option<LobUsage>,
+    collapsed: bool,
     location: (f64, f64),
     node_loc_style: NodeLocationStyle,
 }
@@ -30,17 +32,33 @@ pub struct CapabilityNode {
 pub struct CapabilityNodeTree {
     tree: DTNode<CapabilityNode>,
     layout_direction: TreeLayoutDirection,
+    tree_collapse_policy: TreeCollapsePolicy,
 }
 
 
+/// Specifies which of several options is used for supporting collapsing of the tree.
+#[derive(Debug, Copy, Clone)]
+pub enum TreeCollapsePolicy {
+    Nothing,
+}
+
+thread_local!{
+    /// This threadlocal variable is set before rendering to say which what rules should be
+    /// used for sketching the tree.
+    static TREE_COLLAPSE_POLICY: Cell<TreeCollapsePolicy> = Cell::new(Default::default());
+}
+
+
+
+
 impl CapabilityNode {
-    pub fn new(text: &str, lob_usage: Option<LobUsage>, id_source: &mut usize) -> Self {
+    pub fn new(text: &str, lob_usage: Option<LobUsage>, id_source: &mut usize, collapsed: bool) -> Self {
         let id = *id_source;
         let text = text.to_string();
         let location = (0.0, 0.0); // default location until it gets repositioned
         let node_loc_style = NodeLocationStyle::BranchNode; // everything is assumed to be a branch until proven otherwise
         *id_source += 1;
-        CapabilityNode {id, text, lob_usage, location, node_loc_style}
+        CapabilityNode{id, text, lob_usage, collapsed, location, node_loc_style}
     }
 
     /// Returns the (width, height) of the text string.
@@ -75,10 +93,18 @@ impl Renderable for CapabilityNode {
         // --- decide on decoration & color ---
         let class: &str = match self.node_loc_style {
             NodeLocationStyle::RootNode => "root",
-            NodeLocationStyle::BranchNode => "branch",
+            NodeLocationStyle::BranchNode => if self.collapsed {"leaf"} else {"branch"},
             NodeLocationStyle::LeafNode => "leaf",
         };
-        let (box_color, text_color) = get_color_strs(self.lob_usage);
+        let (box_color, text_color) = if self.collapsed {
+            // FIXME: Here we OUGHT to recurse over descendants to accumulate the total lob_usage.
+            //   But we can't, because there's no way to walk the tree from here. Maybe
+            //   someday I can fix it with ideas from this:
+            //   https://eli.thegreenplace.net/2021/rust-data-structures-with-circular-references/
+            get_color_strs(self.lob_usage)
+        } else {
+            get_color_strs(self.lob_usage)
+        };
 
         // --- draw it ---
         if self.node_loc_style != NodeLocationStyle::RootNode {
@@ -132,10 +158,10 @@ impl SvgPositioned for CapabilityNode {
 
 
 impl CapabilityNodeTree {
-    pub fn new(layout_direction: TreeLayoutDirection) -> Self {
+    pub fn new(layout_direction: TreeLayoutDirection, tree_collapse_policy: TreeCollapsePolicy) -> Self {
         let mut id_source = 0;
-        let tree = DTNode::new(CapabilityNode::new("", None, &mut id_source));
-        CapabilityNodeTree {tree, layout_direction}
+        let tree = DTNode::new(CapabilityNode::new("", None, &mut id_source, false));
+        CapabilityNodeTree {tree, layout_direction, tree_collapse_policy}
     }
 
     /// Adds nodes to the tree.
@@ -177,7 +203,9 @@ impl Renderable for CapabilityNodeTree {
         "#;
         tag_writer.tag_with_text("style", Attributes::new(), style_text)?;
         LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
+        TREE_COLLAPSE_POLICY.with(|it| it.set(self.tree_collapse_policy));
         self.tree.render(tag_writer)?;
+        TREE_COLLAPSE_POLICY.with(|it| it.set(Default::default()));
         LAYOUT_DIRECTION.with(|it| it.set(None));
         tag_writer.end_tag("g")?;
         Ok(())
@@ -192,6 +220,14 @@ impl SvgPositioned for CapabilityNodeTree {
         answer
     }
 }
+
+
+impl Default for TreeCollapsePolicy {
+    fn default() -> Self {
+        TreeCollapsePolicy::Nothing
+    }
+}
+
 
 
 #[allow(dead_code)]
@@ -213,30 +249,31 @@ fn dummy_data() -> CapabilityNodeTree {
 
     let lob_usage = None;
     let mut id_source: usize = 1;
-    let mut tree = CapabilityNodeTree::new(TreeLayoutDirection::Left);
+    let mut tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::Nothing);
+    let collapsed = false;
     tree.grow_tree([
-        AddData(CapabilityNode::new(core_0, lob_usage, &mut id_source)),
-        StartChildren,
-        AddData(CapabilityNode::new(core_0_0, lob_usage, &mut id_source)),
-        StartChildren,
-        AddData(CapabilityNode::new(core_0_0_0, lob_usage, &mut id_source)),
-        AddData(CapabilityNode::new(core_0_0_1, lob_usage, &mut id_source)),
-        AddData(CapabilityNode::new(core_0_0_2, lob_usage, &mut id_source)),
+        AddData(CapabilityNode::new(core_0, lob_usage, &mut id_source, collapsed)),
+        StartChildren(false),
+        AddData(CapabilityNode::new(core_0_0, lob_usage, &mut id_source, collapsed)),
+        StartChildren(false),
+        AddData(CapabilityNode::new(core_0_0_0, lob_usage, &mut id_source, collapsed)),
+        AddData(CapabilityNode::new(core_0_0_1, lob_usage, &mut id_source, collapsed)),
+        AddData(CapabilityNode::new(core_0_0_2, lob_usage, &mut id_source, collapsed)),
         EndChildren,
-        AddData(CapabilityNode::new(core_0_1, lob_usage, &mut id_source)),
-        StartChildren,
-        AddData(CapabilityNode::new(core_0_1_0, lob_usage, &mut id_source)),
-        AddData(CapabilityNode::new(core_0_1_1, lob_usage, &mut id_source)),
+        AddData(CapabilityNode::new(core_0_1, lob_usage, &mut id_source, collapsed)),
+        StartChildren(false),
+        AddData(CapabilityNode::new(core_0_1_0, lob_usage, &mut id_source, collapsed)),
+        AddData(CapabilityNode::new(core_0_1_1, lob_usage, &mut id_source, collapsed)),
         EndChildren,
         EndChildren,
-        AddData(CapabilityNode::new(core_1, lob_usage, &mut id_source)),
-        StartChildren,
-        AddData(CapabilityNode::new(core_1_0, lob_usage, &mut id_source)),
-        AddData(CapabilityNode::new(core_1_1, lob_usage, &mut id_source)),
-        StartChildren,
-        AddData(CapabilityNode::new(core_1_1_0, lob_usage, &mut id_source)),
-        AddData(CapabilityNode::new(core_1_1_1, lob_usage, &mut id_source)),
-        AddData(CapabilityNode::new(core_1_1_2, lob_usage, &mut id_source)),
+        AddData(CapabilityNode::new(core_1, lob_usage, &mut id_source, collapsed)),
+        StartChildren(false),
+        AddData(CapabilityNode::new(core_1_0, lob_usage, &mut id_source, collapsed)),
+        AddData(CapabilityNode::new(core_1_1, lob_usage, &mut id_source, collapsed)),
+        StartChildren(false),
+        AddData(CapabilityNode::new(core_1_1_0, lob_usage, &mut id_source, collapsed)),
+        AddData(CapabilityNode::new(core_1_1_1, lob_usage, &mut id_source, collapsed)),
+        AddData(CapabilityNode::new(core_1_1_2, lob_usage, &mut id_source, collapsed)),
         EndChildren,
         EndChildren,
     ]).expect("The data insertion is unbalanced.");
@@ -351,19 +388,7 @@ pub fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[C
                 .map(|x| record.get(x).unwrap().to_string())
                 .take_while(|x| x.len() > 0)
                 .collect();
-            let mut item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
-
-            // --- If part of it is folded, adjust accordingly ---
-            let mut is_new_node = true; // only in special circumstances is it NOT a new node.
-            if let Some(fold_position) = fold_info.get_fold_position(&this_node_names) {
-                assert!(fold_position < this_node_names.len()); // should always be true
-                item_text = this_node_names.get(fold_position).unwrap().clone();
-                this_node_names.truncate(fold_position);
-                if this_node_names == fields.prev_node_names && item_text == fields.prev_item_text {
-                    // because of folding, we're encountering a repeat. It's not a new node.
-                    is_new_node = false;
-                }
-            }
+            let item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
 
             // --- close out nodes as needed ---
             let mut depth;
@@ -398,25 +423,15 @@ pub fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[C
             // --- create new nodes as needed ---
             while depth < this_node_names.len() {
                 let this_name = this_node_names.get(depth).unwrap();
-                fields.commands.push(AddData(CapabilityNode::new(this_name, None, &mut fields.id_source)));
-                fields.commands.push(StartChildren);
+                let collapsed = fold_info.is_fold_path(&this_node_names, depth + 1);
+                fields.commands.push(AddData(CapabilityNode::new(this_name, None, &mut fields.id_source, collapsed)));
+                fields.commands.push(StartChildren(collapsed));
                 depth += 1;
             }
 
             // --- add THIS node ---
-            if is_new_node {
-                fields.commands.push(AddData(CapabilityNode::new(&item_text, Some(lob_usage), &mut fields.id_source)));
-            } else {
-                // special case: we just want to update the LOB usage because the node already exists.
-                let last_command = fields.commands.last_mut().unwrap();
-                if let AddData(CapabilityNode {lob_usage: Some(mut existing_lob_usage), ..}) = last_command {
-                    // If EITHER the existing node OR the new one is used by this LOB, mark it as in use
-                    existing_lob_usage |= lob_usage;
-                    // FIXME: This takes into account immediate children but (I think) not all descendents
-                } else {
-                    panic!("The previous command ought to be AddData() with an lob_usage");
-                }
-            }
+            let collapsed = false;
+            fields.commands.push(AddData(CapabilityNode::new(&item_text, Some(lob_usage), &mut fields.id_source, collapsed)));
 
             // --- update prev_node_names ---
             fields.prev_node_names = this_node_names;
@@ -425,9 +440,9 @@ pub fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[C
     }
 
     // --- Create a tree from the commands ---
-    let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left);
+    let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::Nothing);
     core_tree.grow_tree(fields_core.commands).expect("The data insertion is unbalanced for core.");
-    let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right);
+    let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::Nothing);
     surround_tree.grow_tree(fields_surround.commands).expect("The data insertion is unbalanced for surround.");
 
     // --- Return the result ---

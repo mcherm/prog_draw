@@ -9,17 +9,17 @@ pub struct FoldInfo {
 
 
 impl FoldInfo {
-    /// If any prefix of the path matches the path to a fold spot, return
-    /// Some(the-position-that-folds). Otherwise, return None.
-    pub fn get_fold_position(&self, path: &Vec<String>) -> Option<usize> {
+    /// Returns true if the path, up to "len" (and ignoring anything past that) should be
+    /// folded.
+    pub fn is_fold_path(&self, path: &Vec<String>, len: usize) -> bool {
         for fold_path in self.fold_paths.iter() { // consider all fold paths we know
-            if fold_path.len() <= path.len() { // where the fold path isn't shorter than the path
-                if zip(fold_path, path).all(|(x,y)| x == y) { // if they match up to the fold path
-                    return Some(fold_path.len() - 1) // then return that position
+            if fold_path.len() == len { // but only ones that are exactly this long
+                if zip(fold_path, path).all(|(x,y)| x == y) { // if they match (up to the len)
+                    return true // then return that position
                 }
             }
         }
-        None // otherwise, it didn't match
+        false
     }
 }
 

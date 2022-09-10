@@ -17,6 +17,7 @@ static LINE_CTRL_OFFSET: Coord = 10.0;
 
 pub struct DTNode<T> {
     pub data: T,
+    pub collapsed: bool,
     pub children: Vec<Box<DTNode<T>>>,
 }
 
@@ -30,7 +31,7 @@ pub struct DTNode<T> {
 #[derive(Debug)]
 pub enum DTNodeBuild<T> {
     AddData(T),
-    StartChildren,
+    StartChildren(bool), // the bool indicates whether the children are collapsed
     EndChildren,
 }
 
@@ -94,8 +95,9 @@ impl<T> DTNode<T> {
 
     /// Returns a new top-level node with this data.
     pub fn new(data: T) -> Self {
+        let collapse = false;
         let children = vec![];
-        DTNode{data, children}
+        DTNode{data, collapsed: collapse, children}
     }
 
     #[allow(dead_code)]
@@ -137,9 +139,10 @@ impl<T> DTNode<T> {
                 DTNodeBuild::AddData(data) => {
                     current.add_child_data(data);
                 },
-                DTNodeBuild::StartChildren => {
+                DTNodeBuild::StartChildren(collapsed) => {
                     stack.push(current.children.len() - 1); // FIXME: watch for underflow
                     current = current.children.last_mut().unwrap().as_mut();
+                    current.collapsed = collapsed
                 }
                 DTNodeBuild::EndChildren => {
                     stack.pop();
@@ -165,41 +168,45 @@ impl<T> DTNode<T> {
 
 impl<T: SvgPositioned> Renderable for DTNode<T> {
     fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
-        // --- Use context to decide whether to draw to the right or the left ---
-        let leftward: bool = match LAYOUT_DIRECTION.with(|it| it.get()) {
-            Some(TreeLayoutDirection::Left) => true,
-            _ => false,
-        };
+        if !self.collapsed {
+            // --- Use context to decide whether to draw to the right or the left ---
+            let leftward: bool = match LAYOUT_DIRECTION.with(|it| it.get()) {
+                Some(TreeLayoutDirection::Left) => true,
+                _ => false,
+            };
 
-        // --- Draw lines to child nodes ---
-        let parent_bbox = self.data.get_bbox();
-        let parent_line_end_x = if leftward {parent_bbox.left()} else {parent_bbox.right()};
-        let parent_line_end_y = parent_bbox.top() + parent_bbox.height() / 2.0;
-        let parent_line_ctrl_x = parent_line_end_x + LINE_CTRL_OFFSET * if leftward {-1.0} else {1.0};
-        let parent_line_ctrl_y = parent_line_end_y;
-        for child in self.children.iter() {
-            let child_bbox = child.data.get_bbox();
-            let child_line_end_x = if leftward {child_bbox.right()} else {child_bbox.left()};
-            let child_line_end_y = child_bbox.top() + child_bbox.height() / 2.0;
-            let child_line_ctrl_x = child_line_end_x + LINE_CTRL_OFFSET * if leftward {1.0} else {-1.0};
-            let child_line_ctrl_y = child_line_end_y;
-            let path_code: String = format_args!(
-                "M {} {} C {} {}, {} {}, {} {}",
-                parent_line_end_x, parent_line_end_y,
-                parent_line_ctrl_x, parent_line_ctrl_y,
-                child_line_ctrl_x, child_line_ctrl_y,
-                child_line_end_x, child_line_end_y
-            ).to_string();
-            tag_writer.single_tag("path", Attributes::from([
-                ("d", &*path_code),
-                ("fill", "none"),
-                ("stroke", "black"),
-            ]))?;
+            // --- Draw lines to child nodes ---
+            let parent_bbox = self.data.get_bbox();
+            let parent_line_end_x = if leftward {parent_bbox.left()} else {parent_bbox.right()};
+            let parent_line_end_y = parent_bbox.top() + parent_bbox.height() / 2.0;
+            let parent_line_ctrl_x = parent_line_end_x + LINE_CTRL_OFFSET * if leftward {-1.0} else {1.0};
+            let parent_line_ctrl_y = parent_line_end_y;
+            for child in self.children.iter() {
+                let child_bbox = child.data.get_bbox();
+                let child_line_end_x = if leftward {child_bbox.right()} else {child_bbox.left()};
+                let child_line_end_y = child_bbox.top() + child_bbox.height() / 2.0;
+                let child_line_ctrl_x = child_line_end_x + LINE_CTRL_OFFSET * if leftward {1.0} else {-1.0};
+                let child_line_ctrl_y = child_line_end_y;
+                let path_code: String = format_args!(
+                    "M {} {} C {} {}, {} {}, {} {}",
+                    parent_line_end_x, parent_line_end_y,
+                    parent_line_ctrl_x, parent_line_ctrl_y,
+                    child_line_ctrl_x, child_line_ctrl_y,
+                    child_line_end_x, child_line_end_y
+                ).to_string();
+                tag_writer.single_tag("path", Attributes::from([
+                    ("d", &*path_code),
+                    ("fill", "none"),
+                    ("stroke", "black"),
+                ]))?;
+            }
+
+            // --- Draw child nodes ---
+            for child in self.children.iter() {
+                child.render(tag_writer)?;
+            }
         }
-        // --- Draw child nodes ---
-        for child in self.children.iter() {
-            child.render(tag_writer)?;
-        }
+
         // --- Draw this node ---
         self.data.render(tag_writer)?;
         Ok(())
@@ -207,11 +214,15 @@ impl<T: SvgPositioned> Renderable for DTNode<T> {
 }
 
 impl<T: SvgPositioned> SvgPositioned for DTNode<T> {
-    // Returns the bbox that covers the root node AND all descendant nodes.
+    // Returns the bbox that covers the root node AND all non-collapsed descendant nodes.
     fn get_bbox(&self) -> Rect {
         let root_rect: Rect = self.data.get_bbox();
-        self.children.iter()
-            .map(|child| child.get_bbox())
-            .fold(root_rect, |r1, r2| r1.cover(&r2))
+        if self.collapsed {
+            root_rect
+        } else {
+            self.children.iter()
+                .map(|child| child.get_bbox())
+                .fold(root_rect, |r1, r2| r1.cover(&r2))
+        }
     }
 }
