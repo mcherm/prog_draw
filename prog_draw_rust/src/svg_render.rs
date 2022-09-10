@@ -1,5 +1,5 @@
 
-use crate::svg_writer::{Renderable, TagWriter, TagWriterError, Attributes, Context};
+use crate::svg_writer::{Renderable, TagWriter, TagWriterError, Attributes};
 use std::fs::File;
 use geometry::{Coord, Rect};
 
@@ -64,7 +64,7 @@ pub mod geometry {
 pub trait SvgPositioned: Renderable {
     /// Returns a bounding box for this item. The bounding box is relative to the local
     /// coordinate system.
-    fn get_bbox(&self, context: &mut Context) -> Rect;
+    fn get_bbox(&self) -> Rect;
 }
 
 
@@ -77,7 +77,7 @@ pub struct BasicBox {
 }
 
 impl Renderable for BasicBox {
-    fn render(&self, tag_writer: &mut TagWriter, _context: &mut Context) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
         tag_writer.single_tag("rect", Attributes::from([
             ("x", self.x.to_string()),
             ("y", self.y.to_string()),
@@ -91,7 +91,7 @@ impl Renderable for BasicBox {
 }
 
 impl SvgPositioned for BasicBox {
-    fn get_bbox(&self, _context: &mut Context) -> Rect {
+    fn get_bbox(&self) -> Rect {
         Rect::new_ltwh(self.x, self.y, self.width, self.height)
     }
 }
@@ -123,14 +123,14 @@ impl Group {
 }
 
 impl Renderable for Group {
-    fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
         let attributes = match &self.transform {
             None => Attributes::new(),
             Some(transform) => Attributes::from([("transform", transform)]),
         };
         tag_writer.begin_tag("g", attributes)?;
         for item in self.items.iter() {
-            item.render(tag_writer, context)?;
+            item.render(tag_writer)?;
         }
         tag_writer.end_tag("g")?;
         Ok(())
@@ -139,9 +139,9 @@ impl Renderable for Group {
 
 
 impl SvgPositioned for Group {
-    fn get_bbox(&self, context: &mut Context) -> Rect {
+    fn get_bbox(&self) -> Rect {
         self.items.iter()
-            .map(|item| item.get_bbox(context))
+            .map(|item| item.get_bbox())
             .reduce(|accum, rect| accum.cover(&rect))
             .unwrap_or(Rect::new_cwh((0.0, 0.0), 0.0, 0.0))
     }
@@ -171,14 +171,14 @@ impl<T: Renderable> Svg<T> {
 }
 
 impl<T: SvgPositioned> Svg<T> {
-    pub fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
-        let bbox = self.content.get_bbox(context);
+    pub fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
+        let bbox = self.content.get_bbox();
         let viewbox: String = format_args!("{} {} {} {}", bbox.left(), bbox.top(), bbox.width(), bbox.height()).to_string();
         tag_writer.begin_tag("svg", Attributes::from([
             ("viewBox", &*viewbox),
             ("xmlns", "http://www.w3.org/2000/svg"),
         ]))?;
-        self.content.render(tag_writer, context)?;
+        self.content.render(tag_writer)?;
         tag_writer.end_tag("svg")?;
         Ok(())
     }
@@ -199,7 +199,7 @@ fn run() -> Result<(),TagWriterError> {
 
     let output2: File = File::create("output/test.svg")?;
     let mut tag_writer = TagWriter::new(output2);
-    svg.render(&mut tag_writer, &mut Context::default())?;
+    svg.render(&mut tag_writer)?;
     tag_writer.close()?;
 
     Ok(())

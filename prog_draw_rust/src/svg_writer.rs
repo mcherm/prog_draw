@@ -2,7 +2,6 @@ use std::fs::File;
 use std::fmt;
 use std::io::Write;
 use std::error::Error;
-use std::collections::HashMap;
 
 
 #[derive(Debug)]
@@ -148,11 +147,8 @@ impl TagWriter {
     }
 }
 
-pub type Context<'a> = HashMap<String,&'a str>;
 
-/// A trait for anything which can be rendered to SVG. Most implementers can completely
-/// ignore the context field -- it's used only in cases where metadata about the context
-/// needs to be provided to child Renderables.
+/// A trait for anything which can be rendered to SVG.
 pub trait Renderable {
-    fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError>;
+    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError>;
 }

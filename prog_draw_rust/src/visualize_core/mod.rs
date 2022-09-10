@@ -6,7 +6,7 @@ mod center_dot;
 
 use std::fs::File;
 use std;
-use super::svg_writer::{Context, TagWriter, TagWriterError};
+use super::svg_writer::{TagWriter, TagWriterError};
 use super::svg_render::{Group, Svg, SvgPositioned};
 use super::svg_render::geometry::{Coord};
 use capability_tree::{CapabilityNodeTree, read_csv};
@@ -60,7 +60,7 @@ fn build_two_tree_view() -> Result<(),TagWriterError> {
     let svg = layout_this_diagram(core_tree, surround_tree);
     let output: File = File::create(OUTPUT_FILENAME)?;
     let mut tag_writer = TagWriter::new(output);
-    svg.render(&mut tag_writer, &mut Context::default())?;
+    svg.render(&mut tag_writer)?;
     tag_writer.close()?;
     Ok(())
 }

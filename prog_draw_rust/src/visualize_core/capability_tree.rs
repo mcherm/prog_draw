@@ -1,21 +1,15 @@
 
 use std::collections::HashMap;
 use itertools::Itertools;
-use super::super::data_tree::{DTNode, DTNodeBuild, InvalidGrowth, DTNodeBuild::{AddData, EndChildren, StartChildren}};
+use super::super::data_tree::{DTNode, DTNodeBuild, InvalidGrowth, TreeLayoutDirection, LAYOUT_DIRECTION, DTNodeBuild::{AddData, EndChildren, StartChildren}};
 use super::super::svg_render::{SvgPositioned, geometry::{Coord, Rect}};
-use super::super::svg_writer::{Attributes, Context, Renderable, TagWriter, TagWriterError};
+use super::super::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
 use super::super::text_size::text_size;
 use super::super::tidy_tree::{NULL_ID, TidyTree};
 use super::lob_usage::{LobUsage, get_color_strs};
 use super::{BASELINE_RISE, fold_up, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
 
 
-
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum TreeLayoutDirection {
-    Right,
-    Left
-}
 
 #[derive(Debug, Eq, PartialEq)]
 pub enum NodeLocationStyle {
@@ -62,14 +56,14 @@ impl CapabilityNode {
 
 
 impl Renderable for CapabilityNode {
-    fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
         // --- Decide the dimensions of everything ---
         let (loc_x, loc_y) = self.location;
         let (text_width, text_height) = self.text_size();
-        let text_left = loc_x + match *context.get("layout_direction").unwrap() {
-            "Right" => TEXT_ITEM_PADDING,
-            "Left" => (TEXT_ITEM_PADDING + text_width) * -1.0,
-            _ => panic!("No layout direction set."),
+        let text_left = loc_x + match LAYOUT_DIRECTION.with(|it| it.get()) {
+            Some(TreeLayoutDirection::Right) => TEXT_ITEM_PADDING,
+            Some(TreeLayoutDirection::Left) => (TEXT_ITEM_PADDING + text_width) * -1.0,
+            None => panic!("No layout direction set."),
         };
         let text_top = loc_y - text_height / 2.0;
         let text_baseline = text_top + text_height - BASELINE_RISE;
@@ -121,15 +115,15 @@ impl SvgPositioned for CapabilityNode {
     // Gives the bounding box for the node including text AND the box around it. Remember, if
     // the node isn't correctly positioned yet, its location will be (0,0). Also know that
     // self.location is the center-left of the box it occupies.
-    fn get_bbox(&self, context: &mut Context) -> Rect {
+    fn get_bbox(&self) -> Rect {
         let center = self.location;
         let (text_width, text_height) = self.text_size();
         let width = text_width + 2.0 * TEXT_ITEM_PADDING;
         let height = text_height + 2.0 * TEXT_ITEM_PADDING;
-        let left = center.0 - match *context.get("layout_direction").unwrap() {
-            "Right" => 0.0,
-            "Left" => width,
-            _ => panic!("Invalid layout direction"),
+        let left = center.0 - match LAYOUT_DIRECTION.with(|it| it.get()) {
+            Some(TreeLayoutDirection::Right) => 0.0,
+            Some(TreeLayoutDirection::Left) => width,
+            None => panic!("No layout direction set."),
         };
         let top = center.1 - height / 2.0;
         Rect::new_ltwh(left, top, width, height)
@@ -151,17 +145,12 @@ impl CapabilityNodeTree {
 
     /// Performs layout of the nodes.
     pub fn layout(&mut self) {
-        // --- set up a context ---
-        let mut context = Context::default();
-        context.insert("layout_direction".to_string(), match self.layout_direction {
-            TreeLayoutDirection::Right => &"Right",
-            TreeLayoutDirection::Left => &"Left",
-        });
-
         // --- use tidy-tree to lay it out ---
         let mut tidy = TidyTree::with_tidy_layout(16.0, 8.0);
-        add_to_tidy(&mut tidy, &self.tree, NULL_ID, &mut context);
+        LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
+        add_to_tidy(&mut tidy, &self.tree, NULL_ID);
         tidy.layout();
+        LAYOUT_DIRECTION.with(|it| it.set(None));
         let locations: HashMap<usize, (f64, f64)> = tidy.get_pos().iter()
             .tuples::<(_,_,_)>() // break into groups of 3
             .map(|(id,x,y)| (*id as usize, match self.layout_direction {
@@ -179,31 +168,27 @@ impl CapabilityNodeTree {
 }
 
 impl Renderable for CapabilityNodeTree {
-    fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
         tag_writer.begin_tag("g", Attributes::new())?;
-        // FIXME: I used to have style here; don't need it now.
         let style_text = r#"
+          text.leaf {
+            pointer-events: none;
+          }x
         "#;
         tag_writer.tag_with_text("style", Attributes::new(), style_text)?;
-        context.insert("layout_direction".to_string(), match self.layout_direction {
-            TreeLayoutDirection::Right => &"Right",
-            TreeLayoutDirection::Left => &"Left",
-        });
-        self.tree.render(tag_writer, context)?;
-        context.remove("layout_direction");
+        LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
+        self.tree.render(tag_writer)?;
+        LAYOUT_DIRECTION.with(|it| it.set(None));
         tag_writer.end_tag("g")?;
         Ok(())
     }
 }
 
 impl SvgPositioned for CapabilityNodeTree {
-    fn get_bbox(&self, context: &mut Context) -> Rect {
-        context.insert("layout_direction".to_string(), match self.layout_direction {
-            TreeLayoutDirection::Right => &"Right",
-            TreeLayoutDirection::Left => &"Left",
-        });
-        let answer = self.tree.get_bbox(context);
-        context.remove("layout_direction");
+    fn get_bbox(&self) -> Rect {
+        LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
+        let answer = self.tree.get_bbox();
+        LAYOUT_DIRECTION.with(|it| it.set(None));
         answer
     }
 }
@@ -260,12 +245,12 @@ fn dummy_data() -> CapabilityNodeTree {
 }
 
 /// Recursive function used in build_tidy_tree().
-fn add_to_tidy(tidy: &mut TidyTree, dtnode: &DTNode<CapabilityNode>, parent_id: usize, context: &mut Context) {
-    let data_bbox = dtnode.data.get_bbox(context);
+fn add_to_tidy(tidy: &mut TidyTree, dtnode: &DTNode<CapabilityNode>, parent_id: usize) {
+    let data_bbox = dtnode.data.get_bbox();
     // note: width and height are swapped because we want to lay it out sideways not vertically
     tidy.add_node(dtnode.data.id, data_bbox.height(), data_bbox.width(), parent_id);
     for child in dtnode.children.iter() {
-        add_to_tidy(tidy, child, dtnode.data.id, context);
+        add_to_tidy(tidy, child, dtnode.data.id);
     }
 }
 

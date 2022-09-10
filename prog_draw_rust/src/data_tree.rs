@@ -6,7 +6,8 @@
 
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
-use super::svg_writer::{Renderable, TagWriter, Attributes, TagWriterError, Context};
+use std::cell::Cell;
+use super::svg_writer::{Renderable, TagWriter, Attributes, TagWriterError};
 use super::svg_render::SvgPositioned;
 use super::svg_render::geometry::{Coord, Rect};
 
@@ -41,6 +42,21 @@ impl Display for InvalidGrowth {
         write!(f, "Invalid Growth")
     }
 }
+
+
+/// Trees can be laid out two ways: to the left or to the right.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub enum TreeLayoutDirection {
+    Right,
+    Left
+}
+
+thread_local!{
+    /// This threadlocal variable is set before rendering to say which way the tree
+    /// should be laid out. If NOT set, it defaults to laying out to the right.
+    pub static LAYOUT_DIRECTION: Cell<Option<TreeLayoutDirection>> = Cell::new(None);
+}
+
 
 impl<T: Debug> Debug for DTNode<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -148,18 +164,21 @@ impl<T> DTNode<T> {
 }
 
 impl<T: SvgPositioned> Renderable for DTNode<T> {
-    fn render(&self, tag_writer: &mut TagWriter, context: &mut Context) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
         // --- Use context to decide whether to draw to the right or the left ---
-        let leftward: bool = *context.get("layout_direction").unwrap_or(&"Right") == "Left";
+        let leftward: bool = match LAYOUT_DIRECTION.with(|it| it.get()) {
+            Some(TreeLayoutDirection::Left) => true,
+            _ => false,
+        };
 
         // --- Draw lines to child nodes ---
-        let parent_bbox = self.data.get_bbox(context);
+        let parent_bbox = self.data.get_bbox();
         let parent_line_end_x = if leftward {parent_bbox.left()} else {parent_bbox.right()};
         let parent_line_end_y = parent_bbox.top() + parent_bbox.height() / 2.0;
         let parent_line_ctrl_x = parent_line_end_x + LINE_CTRL_OFFSET * if leftward {-1.0} else {1.0};
         let parent_line_ctrl_y = parent_line_end_y;
         for child in self.children.iter() {
-            let child_bbox = child.data.get_bbox(context);
+            let child_bbox = child.data.get_bbox();
             let child_line_end_x = if leftward {child_bbox.right()} else {child_bbox.left()};
             let child_line_end_y = child_bbox.top() + child_bbox.height() / 2.0;
             let child_line_ctrl_x = child_line_end_x + LINE_CTRL_OFFSET * if leftward {1.0} else {-1.0};
@@ -179,20 +198,20 @@ impl<T: SvgPositioned> Renderable for DTNode<T> {
         }
         // --- Draw child nodes ---
         for child in self.children.iter() {
-            child.render(tag_writer, context)?;
+            child.render(tag_writer)?;
         }
         // --- Draw this node ---
-        self.data.render(tag_writer, context)?;
+        self.data.render(tag_writer)?;
         Ok(())
     }
 }
 
 impl<T: SvgPositioned> SvgPositioned for DTNode<T> {
     // Returns the bbox that covers the root node AND all descendant nodes.
-    fn get_bbox(&self, context: &mut Context) -> Rect {
-        let root_rect: Rect = self.data.get_bbox(context);
+    fn get_bbox(&self) -> Rect {
+        let root_rect: Rect = self.data.get_bbox();
         self.children.iter()
-            .map(|child| child.get_bbox(context))
+            .map(|child| child.get_bbox())
             .fold(root_rect, |r1, r2| r1.cover(&r2))
     }
 }

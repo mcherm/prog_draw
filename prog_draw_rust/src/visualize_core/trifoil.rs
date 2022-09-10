@@ -1,17 +1,17 @@
 use crate::svg_render::geometry::{Coord,Rect};
-use super::super::svg_writer::{Renderable, TagWriter, TagWriterError, Context};
+use super::super::svg_writer::{Renderable, TagWriter, TagWriterError};
 use super::super::svg_render::{SvgPositioned};
 
 pub struct Trifoil;
 
 impl Renderable for Trifoil {
-    fn render(&self, tag_writer: &mut TagWriter, _context: &mut Context) -> Result<(), TagWriterError> {
+    fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
         tag_writer.raw_svg(TRIFOIL_SVG)
     }
 }
 
 impl SvgPositioned for Trifoil {
-    fn get_bbox(&self, _context: &mut Context) -> Rect {
+    fn get_bbox(&self) -> Rect {
         Rect::new_ltwh(BOUND_LEFT, BOUND_TOP, BOUND_WIDTH, BOUND_HEIGHT)
     }
 }
