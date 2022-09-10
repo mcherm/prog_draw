@@ -15,7 +15,6 @@ use super::svg_render::geometry::{Coord, Rect};
 static LINE_CTRL_OFFSET: Coord = 10.0;
 
 
-#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub struct DTNode<T> {
     pub data: T,
     pub collapsed: bool,

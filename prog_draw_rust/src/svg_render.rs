@@ -98,21 +98,21 @@ impl SvgPositioned for BasicBox {
 
 
 
-pub struct Group {
-    pub items: Vec<Box<dyn SvgPositioned>>,
+pub struct Group<'a> {
+    pub items: Vec<&'a dyn SvgPositioned>,
     transform: Option<String>,
 }
 
-impl Group {
+impl<'a> Group<'a> {
     pub fn new() -> Self {
         Group{items: Vec::new(), transform: None}
     }
 
-    pub fn item_transformed(item: Box<dyn SvgPositioned>, transform: &str) -> Self {
+    pub fn item_transformed(item: &'a dyn SvgPositioned, transform: &str) -> Self {
         Group{items: vec![item], transform: Some(transform.to_string())}
     }
 
-    pub fn add(&mut self, item: Box<dyn SvgPositioned>) {
+    pub fn add(&mut self, item: &'a dyn SvgPositioned) {
         self.items.push(item);
     }
 
@@ -122,7 +122,7 @@ impl Group {
     }
 }
 
-impl Renderable for Group {
+impl<'a> Renderable for Group<'a> {
     fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         let attributes = match &self.transform {
             None => Attributes::new(),
@@ -138,7 +138,7 @@ impl Renderable for Group {
 }
 
 
-impl SvgPositioned for Group {
+impl<'a> SvgPositioned for Group<'a> {
     fn get_bbox(&self) -> Rect {
         self.items.iter()
             .map(|item| item.get_bbox())
@@ -148,9 +148,9 @@ impl SvgPositioned for Group {
 }
 
 
-impl<const N: usize> From<[Box<dyn SvgPositioned>; N]> for Group {
-    fn from(arr: [Box<dyn SvgPositioned>; N]) -> Self {
-        let mut items: Vec<Box<dyn SvgPositioned>> = Vec::with_capacity(N);
+impl<'a, const N: usize> From<[&'a dyn SvgPositioned; N]> for Group<'a> {
+    fn from(arr: [&'a dyn SvgPositioned; N]) -> Self {
+        let mut items: Vec<&'a dyn SvgPositioned> = Vec::with_capacity(N);
         for item in arr {
             items.push(item);
         }
@@ -160,18 +160,18 @@ impl<const N: usize> From<[Box<dyn SvgPositioned>; N]> for Group {
 
 
 
-pub struct Svg {
-    content: Group,
+pub struct Svg<'a> {
+    content: Group<'a>,
     margin: Coord,
 }
 
-impl Svg {
-    pub fn new(content: Group, margin: Coord) -> Self {
+impl<'a> Svg<'a> {
+    pub fn new(content: Group<'a>, margin: Coord) -> Self {
         Svg{content, margin}
     }
 }
 
-impl Renderable for Svg {
+impl<'a> Renderable for Svg<'a> {
     fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         let bbox = self.content.get_bbox();
         let viewbox: String = format_args!(
@@ -200,8 +200,8 @@ fn run() -> Result<(),TagWriterError> {
     let box_1 = BasicBox{x:  5.0, y: 3.0, height: 40.0, width: 50.0};
     let box_2 = BasicBox{x: 12.0, y: 6.0, height: 40.0, width: 50.0};
     let mut group = Group::new();
-    group.add(Box::new(box_1));
-    group.add(Box::new(box_2));
+    group.add(&box_1);
+    group.add(&box_2);
     let svg = Svg{content: group, margin: 0.0};
 
     let mut output2: File = File::create("output/test.svg")?;

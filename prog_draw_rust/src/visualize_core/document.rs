@@ -67,15 +67,16 @@ impl TwoTreeViewDocument {
     pub fn output_to(&self, output: &mut dyn std::io::Write) -> Result<(),TagWriterError> {
         let shift_dist = CENTER_DOT_RADIUS - 2.0 * TEXT_ITEM_PADDING;
 
-        let core_tree_group = Group::item_transformed(Box::new(self.core_tree.clone()), &format!("translate({},0)", shift_dist * -1.0));
-        let surround_tree_group = Group::item_transformed(Box::new(self.surround_tree.clone()), &format!("translate({},0)", shift_dist));
-        let trifoil_group = Group::item_transformed(Box::new(trifoil::Trifoil), "translate(0 -250) scale(0.5)");
 
-        let content: [Box<dyn SvgPositioned>; 4] = [
-            Box::new(trifoil_group),
-            Box::new(core_tree_group),
-            Box::new(surround_tree_group),
-            Box::new(CenterDot),
+        let core_tree_group = Group::item_transformed(&self.core_tree, &format!("translate({},0)", shift_dist * -1.0));
+        let surround_tree_group = Group::item_transformed(&self.surround_tree, &format!("translate({},0)", shift_dist));
+        let trifoil_group = Group::item_transformed(&trifoil::Trifoil, "translate(0 -250) scale(0.5)");
+
+        let content: [&dyn SvgPositioned; 4] = [
+            &trifoil_group,
+            &core_tree_group,
+            &surround_tree_group,
+            &CenterDot,
         ];
         let svg = Svg::new(Group::from(content), SVG_MARGIN);
 

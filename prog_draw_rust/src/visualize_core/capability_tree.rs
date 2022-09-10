@@ -14,7 +14,6 @@ use super::fold_up;
 
 
 #[derive(Debug, Eq, PartialEq)]
-#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub enum NodeLocationStyle {
     RootNode,
     BranchNode,
@@ -22,7 +21,6 @@ pub enum NodeLocationStyle {
 }
 
 #[derive(Debug)]
-#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub struct CapabilityNode {
     id: usize,
     text: String,
@@ -32,7 +30,6 @@ pub struct CapabilityNode {
     node_loc_style: NodeLocationStyle,
 }
 
-#[derive(Clone)] // FIXME: It shouldn't need to be cloned; I can fix that later
 pub struct CapabilityNodeTree {
     tree: DTNode<CapabilityNode>,
     layout_direction: TreeLayoutDirection,
