@@ -239,7 +239,7 @@ impl Renderable for CapabilityNodeTree {
         let style_text = r#"
           text.leaf {
             pointer-events: none;
-          }x
+          }
         "#;
         tag_writer.tag_with_text("style", Attributes::new(), style_text)?;
         LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
