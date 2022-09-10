@@ -22,6 +22,8 @@ const TEXT_ITEM_PADDING: Coord = 2.0;
 const BASELINE_RISE: Coord = 2.0;
 const NODE_ITEM_ROUND_CORNER: Coord = 3.0;
 const CENTER_DOT_RADIUS: Coord = 16.0;
+const COLLAPSE_DOT_RADIUS: Coord = 3.0;
+const SVG_MARGIN: Coord = 10.0;
 
 
 /// Function that places all the pieces that are highly specific to the diagram we
@@ -39,7 +41,7 @@ fn layout_this_diagram(core_tree: CapabilityNodeTree, surround_tree: CapabilityN
         Box::new(surround_tree_group),
         Box::new(CenterDot),
     ];
-    Svg::new(Group::from(content))
+    Svg::new(Group::from(content), SVG_MARGIN)
 }
 
 

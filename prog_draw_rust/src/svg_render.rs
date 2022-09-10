@@ -162,18 +162,25 @@ impl<const N: usize> From<[Box<dyn SvgPositioned>; N]> for Group {
 
 pub struct Svg<T: Renderable> {
     content: T,
+    margin: Coord,
 }
 
 impl<T: Renderable> Svg<T> {
-    pub fn new(content: T) -> Self {
-        Svg{content}
+    pub fn new(content: T, margin: Coord) -> Self {
+        Svg{content, margin}
     }
 }
 
 impl<T: SvgPositioned> Svg<T> {
     pub fn render(&self, tag_writer: &mut TagWriter) -> Result<(), TagWriterError> {
         let bbox = self.content.get_bbox();
-        let viewbox: String = format_args!("{} {} {} {}", bbox.left(), bbox.top(), bbox.width(), bbox.height()).to_string();
+        let viewbox: String = format_args!(
+            "{} {} {} {}",
+            bbox.left() - self.margin,
+            bbox.top() - self.margin,
+            bbox.width() + 2.0 * self.margin,
+            bbox.height() + 2.0 * self.margin
+        ).to_string();
         tag_writer.begin_tag("svg", Attributes::from([
             ("viewBox", &*viewbox),
             ("xmlns", "http://www.w3.org/2000/svg"),
@@ -195,7 +202,7 @@ fn run() -> Result<(),TagWriterError> {
     let mut group = Group::new();
     group.add(Box::new(box_1));
     group.add(Box::new(box_2));
-    let svg = Svg{content: group};
+    let svg = Svg{content: group, margin: 0.0};
 
     let output2: File = File::create("output/test.svg")?;
     let mut tag_writer = TagWriter::new(output2);

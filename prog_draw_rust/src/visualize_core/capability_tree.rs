@@ -8,7 +8,7 @@ use super::super::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError
 use super::super::text_size::text_size;
 use super::super::tidy_tree::{NULL_ID, TidyTree};
 use super::lob_usage::{LobUsage, get_color_strs};
-use super::{BASELINE_RISE, fold_up, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
+use super::{BASELINE_RISE, fold_up, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING, COLLAPSE_DOT_RADIUS};
 
 
 
@@ -40,6 +40,7 @@ pub struct CapabilityNodeTree {
 #[derive(Debug, Copy, Clone)]
 pub enum TreeCollapsePolicy {
     Nothing,
+    JavaScriptReplace,
 }
 
 thread_local!{
@@ -106,6 +107,31 @@ impl Renderable for CapabilityNode {
             get_color_strs(self.lob_usage)
         };
 
+        // --- Decide how we're handling collapsed things ---
+        struct JSReplaceData {
+            control_cx: Coord,
+            control_cy: Coord,
+            fill: String,
+            onclick: String,
+        }
+        let right_left = match LAYOUT_DIRECTION.with(|it| it.get()) {
+            Some(TreeLayoutDirection::Left) => -1.0,
+            _ => 1.0
+        };
+        let jsreplace_data = match (&self.node_loc_style, TREE_COLLAPSE_POLICY.with(|it| it.get())) {
+            (NodeLocationStyle::BranchNode, TreeCollapsePolicy::JavaScriptReplace) => Some(JSReplaceData{
+                control_cx: loc_x + box_width * right_left,
+                control_cy: loc_y,
+                fill: (if self.collapsed {"#000000"} else {"#FFFFFF"}).to_string(),
+                onclick: format_args!(
+                    "alert('{} {}')",
+                    if self.collapsed {"Open"} else {"Close"},
+                    self.id
+                ).to_string(),
+            }),
+            (_, _) => None, // show nothing if that's how we want to render it
+        };
+
         // --- draw it ---
         if self.node_loc_style != NodeLocationStyle::RootNode {
             tag_writer.single_tag("rect", Attributes::from([
@@ -131,6 +157,20 @@ impl Renderable for CapabilityNode {
                 ]),
                 &self.text
             )?;
+            match jsreplace_data {
+                None => {},
+                Some(jsreplace_data) => {
+                    tag_writer.single_tag("circle", Attributes::from([
+                        ("cx", &*jsreplace_data.control_cx.to_string()),
+                        ("cy", &*jsreplace_data.control_cy.to_string()),
+                        ("r", &*COLLAPSE_DOT_RADIUS.to_string()),
+                        ("fill", &jsreplace_data.fill),
+                        ("stroke", "#000000"),
+                        ("stroke-width", "1.0"),
+                        ("onclick", &jsreplace_data.onclick),
+                    ]))?;
+                },
+            }
         }
         Ok(())
     }
@@ -440,9 +480,9 @@ pub fn read_csv(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[C
     }
 
     // --- Create a tree from the commands ---
-    let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::Nothing);
+    let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::JavaScriptReplace);
     core_tree.grow_tree(fields_core.commands).expect("The data insertion is unbalanced for core.");
-    let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::Nothing);
+    let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::JavaScriptReplace);
     surround_tree.grow_tree(fields_surround.commands).expect("The data insertion is unbalanced for surround.");
 
     // --- Return the result ---
