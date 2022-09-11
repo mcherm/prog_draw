@@ -361,8 +361,10 @@ fn add_to_tidy(tidy: &mut TidyTree, dtnode: &DTNode<CapabilityNode>, parent_id: 
     let data_bbox = dtnode.data.get_bbox();
     // note: width and height are swapped because we want to lay it out sideways not vertically
     tidy.add_node(dtnode.data.id, data_bbox.height(), data_bbox.width(), parent_id);
-    for child in dtnode.children.iter() {
-        add_to_tidy(tidy, child, dtnode.data.id);
+    if !dtnode.collapsed {
+        for child in dtnode.children.iter() {
+            add_to_tidy(tidy, child, dtnode.data.id);
+        }
     }
 }
 
@@ -372,8 +374,10 @@ fn populate_locations(dtnode: &mut DTNode<CapabilityNode>, locations: &HashMap<u
         None => panic!("All locations should be set but aren't."),
         Some((x,y)) => dtnode.data.location = (*y, *x),
     }
-    for child in dtnode.children.iter_mut() {
-        populate_locations(child, locations);
+    if !dtnode.collapsed {
+        for child in dtnode.children.iter_mut() {
+            populate_locations(child, locations);
+        }
     }
 }
 
