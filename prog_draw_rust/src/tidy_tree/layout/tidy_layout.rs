@@ -1,7 +1,6 @@
 use std::{collections::HashSet, hash::BuildHasher, ptr::NonNull, thread::panicking};
 
 use num::Float;
-use tinyset::SetUsize;
 
 use super::super::{geometry::Coord, node::TidyData, utils::nocheck_mut, Layout, Node};
 
@@ -358,8 +357,8 @@ impl TidyLayout {
         node.set_extreme();
     }
 
-    fn first_walk_with_filter(&mut self, node: &mut Node, set: &SetUsize) {
-        if !set.contains(node as *const _ as usize) {
+    fn first_walk_with_filter(&mut self, node: &mut Node, set: &HashSet<usize>) {
+        if !set.contains(&node.id) {
             invalidate_extreme_thread(node);
             return;
         }
@@ -394,10 +393,10 @@ impl TidyLayout {
         }
     }
 
-    fn second_walk_with_filter(&mut self, node: &mut Node, mut mod_sum: Coord, set: &SetUsize) {
+    fn second_walk_with_filter(&mut self, node: &mut Node, mut mod_sum: Coord, set: &HashSet<usize>) {
         mod_sum += node.tidy_mut().modifier_to_subtree;
         let new_x = node.relative_x + mod_sum;
-        if (new_x - node.x).abs() < 1e-8 && !set.contains(node as *const _ as usize) {
+        if (new_x - node.x).abs() < 1e-8 && !set.contains(&node.id) {
             return;
         }
 
@@ -447,7 +446,7 @@ impl Layout for TidyLayout {
             self.set_y_recursive(node);
         }
 
-        let mut set: SetUsize = SetUsize::new();
+        let mut set: HashSet<usize> = HashSet::new();
         for node in changed.iter() {
             set.insert(node.as_ptr() as usize);
             let mut node = unsafe { &mut *node.as_ptr() };

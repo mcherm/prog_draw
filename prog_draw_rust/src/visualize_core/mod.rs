@@ -5,13 +5,14 @@ mod capability_tree;
 mod center_dot;
 mod document;
 
+#[allow(unused_imports)]
 use std::fs::File;
 use std;
 use super::svg_writer::TagWriterError;
 use capability_tree::read_csv_from_str;
 
 
-
+#[allow(dead_code)]
 const OUTPUT_FILENAME: &str = "output/core_surrounds.svg";
 
 
@@ -29,8 +30,15 @@ fn build_two_tree_view() -> Result<(),TagWriterError> {
     let two_tree_view = document::TwoTreeViewDocument::new(core_tree, surround_tree);
 
     // -- Output it ---
+    /* FIXME: KEEP this part - I'll need it later.
     let mut output: File = File::create(OUTPUT_FILENAME)?;
     two_tree_view.output_to(&mut output)?;
+    Ok(())
+    */
+
+    // --- Output to String ---
+    let svg_text = two_tree_view.get_svg_str()?;
+    println!("{}", svg_text);
     Ok(())
 }
 

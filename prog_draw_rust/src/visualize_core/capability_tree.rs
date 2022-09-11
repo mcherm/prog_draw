@@ -124,13 +124,9 @@ impl Renderable for CapabilityNode {
                 control_cx: loc_x + box_width * right_left,
                 control_cy: loc_y,
                 fill: (if self.collapsed {"#000000"} else {"#FFFFFF"}).to_string(),
-                onclick: format_args!(
-                    "alert('{} {}')",
-                    if self.collapsed {"Open"} else {"Close"},
-                    self.id
-                ).to_string(),
+                onclick: format_args!("toggle_then_draw({})", self.id).to_string(),
             }),
-            (_, _) => None, // show nothing if that's how we want to render it
+            (_, _) => None,
         };
 
         // --- draw it ---
