@@ -58,7 +58,6 @@ pub fn get_svg() -> String {
 
 #[wasm_bindgen]
 pub fn toggle_node(node_id: u32) -> String {
-    alert(&format!("Toggle node {}", node_id));
     global_document().lock().unwrap().toggle_collapse(node_id.try_into().unwrap());
     get_svg()
 }

@@ -30,6 +30,7 @@ pub struct CapabilityNode {
     node_loc_style: NodeLocationStyle,
 }
 
+#[derive(Debug)]
 pub struct CapabilityNodeTree {
     tree: DTNode<CapabilityNode>,
     layout_direction: TreeLayoutDirection,
@@ -241,6 +242,7 @@ impl CapabilityNodeTree {
             if tree_node.data.id == node_id {
                 match tree_node.data.node_loc_style {
                     NodeLocationStyle::BranchNode => {
+                        tree_node.collapsed = ! tree_node.collapsed;
                         tree_node.data.collapsed = !tree_node.data.collapsed;
                         Outcome::FoundAndChanged
                     },
