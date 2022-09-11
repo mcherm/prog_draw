@@ -6,7 +6,7 @@ use crate::visualize_core::document::{BASELINE_RISE, COLLAPSE_DOT_RADIUS, NODE_I
 use super::super::data_tree::{DTNode, DTNodeBuild, DTNodeBuild::{AddData, EndChildren, StartChildren}, InvalidGrowth, LAYOUT_DIRECTION, TreeLayoutDirection};
 use super::super::svg_render::{geometry::{Coord, Rect}, SvgPositioned};
 use super::super::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
-use super::super::text_size::text_size;
+use super::super::text_size::{get_system_text_sizer};
 use super::super::tidy_tree::{NULL_ID, TidyTree};
 use super::lob_usage::{get_color_strs, LobUsage};
 use super::fold_up;
@@ -65,12 +65,10 @@ impl CapabilityNode {
 
     /// Returns the (width, height) of the text string.
     fn text_size(&self) -> (Coord, Coord) {
-        let maybe_size = text_size(&self.text, "Arial", 14.0);
-        if maybe_size.is_err() {
-            panic!("Sizing for Arial font isn't working.");
+        match get_system_text_sizer().text_size(&self.text, "Arial", 14.0) {
+            Err(_) => panic!("Sizing isn't working."),
+            Ok((width,height)) => (width as Coord, height as Coord)
         }
-        let (width_int, height_int) = maybe_size.unwrap();
-        (width_int as Coord, height_int as Coord)
     }
 }
 

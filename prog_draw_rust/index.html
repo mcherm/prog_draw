@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en-US">
+    <head>
+        <meta charset="utf-8">
+        <title>prog_draw_rust</title>
+    </head>
+    <body>
+        <h2>ABOVE</h2>
+        <div id="svg_container"></div>
+        <h2>BELOW</h2>
+        <script type="module">
+            window.log = function(s) {
+                console.log(s);
+            }
+            window.get_text_width = function(text, font) {
+                if (!window.text_sizer) {
+                    window.text_sizer = {}
+                    window.text_sizer.element = document.createElement('canvas');
+                    window.text_sizer.context = window.text_sizer.element.getContext("2d");
+                }
+                window.text_sizer.context.font = font;
+                return window.text_sizer.context.measureText(text).width;
+            }
+            window.get_text_height = function(text, font) {
+                return parseFloat(font)
+            }
+            // For both of those, "12.4px Arial" is an example of a font value.
+
+
+            import init, {get_svg, toggle_node, initialize} from "./pkg/prog_draw.js";
+            window.toggle_then_draw = function(id) {
+                document.getElementById("svg_container").innerHTML = toggle_node(id);
+            };
+            init()
+                .then(() => {
+                    initialize();
+                    document.getElementById("svg_container").innerHTML = get_svg();
+                });
+        </script>
+    </body>
+</html>

@@ -16,10 +16,7 @@ use capability_tree::read_csv_from_str;
 const OUTPUT_FILENAME: &str = "output/core_surrounds.svg";
 
 
-
-/// Build and render the view that shows two trees (for core and surrounds) somewhat folded
-/// and neatly laid out with a key to the colors.
-fn build_two_tree_view() -> Result<(),TagWriterError> {
+pub fn get_two_tree_view() -> Result<document::TwoTreeViewDocument,TagWriterError> {
     // --- Read in the file saying what to ignore due to folding ---
     let fold_info = fold_up::read_fold_info_from_str(include_str!("../../input/fold_up.csv"))?;
 
@@ -27,7 +24,14 @@ fn build_two_tree_view() -> Result<(),TagWriterError> {
     let [core_tree, surround_tree] = read_csv_from_str(include_str!("../../input/core_surrounds.csv"), fold_info)?;
 
     // --- Create the document ---
-    let two_tree_view = document::TwoTreeViewDocument::new(core_tree, surround_tree);
+    let answer = Ok(document::TwoTreeViewDocument::new(core_tree, surround_tree));
+    answer
+}
+
+/// Build and render the view that shows two trees (for core and surrounds) somewhat folded
+/// and neatly laid out with a key to the colors.
+fn build_two_tree_view() -> Result<(),TagWriterError> {
+    let two_tree_view = get_two_tree_view()?;
 
     // -- Output it ---
     /* FIXME: KEEP this part - I'll need it later.
@@ -45,6 +49,7 @@ fn build_two_tree_view() -> Result<(),TagWriterError> {
 
 /// This is the main entry point of the visualize_core functionality.
 /// When run, it outputs some hardcoded data to output/core_surrounds.svg
+#[allow(dead_code)]
 pub fn visualize_core() {
     match build_two_tree_view() {
         Ok(_) => {},
