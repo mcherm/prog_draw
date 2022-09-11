@@ -10,13 +10,14 @@ use std::fs::File;
 use std;
 use super::svg_writer::TagWriterError;
 use capability_tree::read_csv_from_str;
+pub use document::TwoTreeViewDocument;
 
 
 #[allow(dead_code)]
 const OUTPUT_FILENAME: &str = "output/core_surrounds.svg";
 
 
-pub fn get_two_tree_view() -> Result<document::TwoTreeViewDocument,TagWriterError> {
+pub fn get_two_tree_view() -> Result<TwoTreeViewDocument,TagWriterError> {
     // --- Read in the file saying what to ignore due to folding ---
     let fold_info = fold_up::read_fold_info_from_str(include_str!("../../input/fold_up.csv"))?;
 
@@ -24,7 +25,7 @@ pub fn get_two_tree_view() -> Result<document::TwoTreeViewDocument,TagWriterErro
     let [core_tree, surround_tree] = read_csv_from_str(include_str!("../../input/core_surrounds.csv"), fold_info)?;
 
     // --- Create the document ---
-    let answer = Ok(document::TwoTreeViewDocument::new(core_tree, surround_tree));
+    let answer = Ok(TwoTreeViewDocument::new(core_tree, surround_tree));
     answer
 }
 

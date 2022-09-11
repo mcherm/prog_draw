@@ -226,6 +226,44 @@ impl CapabilityNodeTree {
         // set the node_loc_style
         set_node_loc_style(&mut self.tree);
     }
+
+    /// Toggles the collapsed state of a node. Leaf and Root nodes are unaffected. Calling this
+    /// with a node_id not found in the tree has no affect. Returns true if the tree needs to
+    /// be laid out again after this, and false if it doesn't.
+    ///
+    /// FIXME: if DTNode someday grows a method for iterating over the tree I could use
+    ///   that. Until then, it's done directly in this method.
+    pub fn toggle_collapse(&mut self, node_id: usize) -> bool {
+        /// Output of Internal recursive subroutine.
+        enum Outcome {NotFound, FoundAndChanged, FoundNoChange}
+        /// Internal recursive subroutine.
+        fn toggle_collapse_node(node_id: usize, tree_node: &mut DTNode<CapabilityNode>) -> Outcome {
+            if tree_node.data.id == node_id {
+                match tree_node.data.node_loc_style {
+                    NodeLocationStyle::BranchNode => {
+                        tree_node.data.collapsed = !tree_node.data.collapsed;
+                        Outcome::FoundAndChanged
+                    },
+                    _ => Outcome::FoundNoChange,
+                }
+            } else {
+                for child in tree_node.children.iter_mut() {
+                    match toggle_collapse_node(node_id, child) {
+                        Outcome::NotFound => {},
+                        found_outcome => return found_outcome,
+                    }
+                }
+                Outcome::NotFound
+            }
+        }
+
+        // --- Call the recursive subroutine on the tree ---
+        match toggle_collapse_node(node_id, &mut self.tree) {
+            Outcome::NotFound => false,
+            Outcome::FoundNoChange => false,
+            Outcome::FoundAndChanged => true,
+        }
+    }
 }
 
 impl Renderable for CapabilityNodeTree {
