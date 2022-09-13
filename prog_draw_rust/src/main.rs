@@ -10,7 +10,6 @@ mod data_tree;
 use text_size::set_system_text_sizer;
 
 fn main() {
-    svg_render::main();
     unsafe { // system initialization; must happen before anything else
         set_system_text_sizer(&macos_text_size::MacOSTextSizer);
     }

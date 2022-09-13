@@ -1,6 +1,5 @@
 
-use crate::svg_writer::{Renderable, TagWriterImpl, TagWriter, TagWriterError, Attributes};
-use std::fs::File;
+use crate::svg_writer::{Renderable, TagWriter, TagWriterError, Attributes};
 use geometry::{Coord, Rect};
 
 // FIXME: Maybe this belongs somewhere else
@@ -10,6 +9,7 @@ pub mod geometry {
 
     pub type Point = (Coord, Coord);
 
+    #[derive(Debug, Copy, Clone)]
     pub struct Rect {
         left: Coord,
         top: Coord,
@@ -54,6 +54,32 @@ pub mod geometry {
                 f64::max(self.bottom(), other.bottom()),
             )
         }
+
+        /// Translates this Rect by (dx,dy).
+        pub fn translate(&mut self, dx: Coord, dy: Coord) {
+            self.left += dx;
+            self.top += dy;
+        }
+
+        /// Returns a new Rect that is the old one but translated by (dx,dy).
+        pub fn translated(&self, dx: Coord, dy: Coord) -> Self {
+            Rect{left: self.left + dx, top: self.top + dy, width: self.width, height: self.height}
+        }
+
+        /// Scales this Rect by s, keeping the center fixed.
+        pub fn scale_about_center(&mut self, s: Coord) {
+            let center_adj = (1.0 - s) / 2.0;
+            self.left += self.width * center_adj;
+            self.top += self.height * center_adj;
+            self.width *= s;
+            self.height *= s;
+        }
+
+        /// Scales this Rect by s, keeping the center fixed.
+        pub fn scaled_about_center(&mut self, s: Coord) -> Self {
+            Rect::new_cwh(self.center(), s * self.width, s * self.height)
+        }
+
     }
 
 }
@@ -100,31 +126,50 @@ impl SvgPositioned for BasicBox {
 
 pub struct Group<'a> {
     pub items: Vec<&'a dyn SvgPositioned>,
-    transform: Option<String>,
+    translate: Option<(Coord, Coord)>,
+    scale: Option<Coord>,
 }
 
 impl<'a> Group<'a> {
+    #![allow(dead_code)]
+
+
     pub fn new() -> Self {
-        Group{items: Vec::new(), transform: None}
+        Group{items: Vec::new(), translate: None, scale: None}
     }
 
-    pub fn item_transformed(item: &'a dyn SvgPositioned, transform: &str) -> Self {
-        Group{items: vec![item], transform: Some(transform.to_string())}
+    pub fn item_transformed(item: &'a dyn SvgPositioned, translate: Option<(Coord,Coord)>, scale: Option<Coord>) -> Self {
+        Group{items: vec![item], translate, scale}
     }
 
     pub fn add(&mut self, item: &'a dyn SvgPositioned) {
         self.items.push(item);
     }
 
-    #[allow(dead_code)] // FIXME: It isn't used yet.
-    pub fn set_transform(&mut self, transform: Option<String>) {
-        self.transform = transform;
+    /// Call this to set the translate for the group.
+    pub fn set_translate(&mut self, translate: Option<(Coord, Coord)>) {
+        self.translate = translate;
+    }
+
+    /// Call this to set the scale factor for the group.
+    pub fn set_scale(&mut self, scale: Option<Coord>) {
+        self.scale = scale;
+    }
+
+    /// Returns the translate string.
+    fn get_transform(&self) -> Option<String> {
+        match (self.translate, self.scale) {
+            (None, None) => None,
+            (Some((x,y)), None) => Some(format!("translate({}, {})", x, y)),
+            (None, Some(s)) => Some(format!("scale({})", s)),
+            (Some((x,y)), Some(s)) => Some(format!("translate({}, {}) scale({})", x, y, s)),
+        }
     }
 }
 
 impl<'a> Renderable for Group<'a> {
     fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
-        let attributes = match &self.transform {
+        let attributes = match &self.get_transform() {
             None => Attributes::new(),
             Some(transform) => Attributes::from([("transform", transform)]),
         };
@@ -140,10 +185,17 @@ impl<'a> Renderable for Group<'a> {
 
 impl<'a> SvgPositioned for Group<'a> {
     fn get_bbox(&self) -> Rect {
-        self.items.iter()
+        let mut r: Rect = self.items.iter()
             .map(|item| item.get_bbox())
             .reduce(|accum, rect| accum.cover(&rect))
-            .unwrap_or(Rect::new_cwh((0.0, 0.0), 0.0, 0.0))
+            .unwrap_or(Rect::new_cwh((0.0, 0.0), 0.0, 0.0));
+        if let Some(s) = self.scale {
+            r.scale_about_center(s);
+        }
+        if let Some((dx, dy)) = self.translate {
+            r.translate(dx, dy);
+        }
+        r
     }
 }
 
@@ -154,7 +206,7 @@ impl<'a, const N: usize> From<[&'a dyn SvgPositioned; N]> for Group<'a> {
         for item in arr {
             items.push(item);
         }
-        Group{items, transform: None}
+        Group{items, translate: None, scale: None}
     }
 }
 
@@ -191,46 +243,3 @@ impl<'a> Renderable for Svg<'a> {
     }
 }
 
-
-
-
-// Demonstrate how to build a diagram.
-fn run() -> Result<(),TagWriterError> {
-
-    let box_1 = BasicBox{x:  5.0, y: 3.0, height: 40.0, width: 50.0};
-    let box_2 = BasicBox{x: 12.0, y: 6.0, height: 40.0, width: 50.0};
-    let mut group = Group::new();
-    group.add(&box_1);
-    group.add(&box_2);
-    let svg = Svg{content: group, margin: 0.0};
-
-    let mut output2: File = File::create("output/test.svg")?;
-    let mut tag_writer: TagWriterImpl = TagWriterImpl::new(&mut output2);
-    svg.render(&mut tag_writer)?;
-    tag_writer.close()?;
-
-    Ok(())
-}
-
-
-
-#[allow(dead_code)]
-pub fn main() {
-    match run() {
-        Ok(()) => {
-            println!("Begin!");
-            match run() {
-                Ok(()) => {
-                    println!("Done!");
-                }
-                Err(err) => {
-                    println!("Error: {}", err);
-                }
-            }
-        },
-        Err(err) => {
-            println!("Error: {}", err);
-        }
-    }
-
-}

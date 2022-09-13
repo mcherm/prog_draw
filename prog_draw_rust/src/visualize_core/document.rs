@@ -16,7 +16,7 @@ pub const BASELINE_RISE: Coord = 2.0;
 pub const NODE_ITEM_ROUND_CORNER: Coord = 3.0;
 pub const CENTER_DOT_RADIUS: Coord = 16.0;
 pub const COLLAPSE_DOT_RADIUS: Coord = 3.0;
-pub const SVG_MARGIN: Coord = 10.0;
+pub const SVG_MARGIN: Coord = 0.0;
 
 
 
@@ -69,9 +69,9 @@ impl TwoTreeViewDocument {
         let shift_dist = CENTER_DOT_RADIUS - 2.0 * TEXT_ITEM_PADDING;
 
 
-        let core_tree_group = Group::item_transformed(&self.core_tree, &format!("translate({},0)", shift_dist * -1.0));
-        let surround_tree_group = Group::item_transformed(&self.surround_tree, &format!("translate({},0)", shift_dist));
-        let trifoil_group = Group::item_transformed(&trifoil::Trifoil, "translate(0 -250) scale(0.5)");
+        let core_tree_group = Group::item_transformed(&self.core_tree, Some((shift_dist * -1.0, 0.0)), None);
+        let surround_tree_group = Group::item_transformed(&self.surround_tree, Some((shift_dist, 0.0)), None);
+        let trifoil_group = Group::item_transformed(&trifoil::Trifoil, Some((0.0, -250.0)), Some(0.5));
 
         let content: [&dyn SvgPositioned; 4] = [
             &trifoil_group,
