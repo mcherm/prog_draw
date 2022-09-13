@@ -7,9 +7,9 @@
 use std::error::Error;
 use std::fmt::{Debug, Display, Formatter};
 use std::cell::Cell;
-use super::svg_writer::{Renderable, TagWriter, Attributes, TagWriterError};
-use super::svg_render::SvgPositioned;
-use super::svg_render::geometry::{Coord, Rect};
+use crate::svg_writer::{Renderable, TagWriter, Attributes, TagWriterError};
+use crate::svg_render::SvgPositioned;
+use crate::geometry::{Coord, Rect};
 
 
 static LINE_CTRL_OFFSET: Coord = 10.0;

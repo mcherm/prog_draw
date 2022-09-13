@@ -3,11 +3,12 @@ use std::collections::HashMap;
 use std::cell::Cell;
 use itertools::Itertools;
 use crate::visualize_core::document::{BASELINE_RISE, COLLAPSE_DOT_RADIUS, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
-use super::super::data_tree::{DTNode, DTNodeBuild, DTNodeBuild::{AddData, EndChildren, StartChildren}, InvalidGrowth, LAYOUT_DIRECTION, TreeLayoutDirection};
-use super::super::svg_render::{geometry::{Coord, Rect}, SvgPositioned};
-use super::super::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
-use super::super::text_size::{get_system_text_sizer};
-use super::super::tidy_tree::{NULL_ID, TidyTree};
+use crate::data_tree::{DTNode, DTNodeBuild, DTNodeBuild::{AddData, EndChildren, StartChildren}, InvalidGrowth, LAYOUT_DIRECTION, TreeLayoutDirection};
+use crate::svg_render::SvgPositioned;
+use crate::geometry::{Coord, Rect};
+use crate::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
+use crate::text_size::{get_system_text_sizer};
+use crate::tidy_tree::{NULL_ID, TidyTree};
 use super::lob_usage::{get_color_strs, LobUsage};
 use super::fold_up;
 

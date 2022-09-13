@@ -1,4 +1,5 @@
 
+mod geometry;
 mod svg_render;
 mod visualize_core;
 mod svg_writer;

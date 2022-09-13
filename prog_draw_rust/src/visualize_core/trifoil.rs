@@ -1,4 +1,4 @@
-use crate::svg_render::geometry::{Coord,Rect};
+use crate::geometry::{Coord,Rect};
 use super::super::svg_writer::{Renderable, TagWriter, TagWriterError};
 use super::super::svg_render::{SvgPositioned};
 

@@ -2,7 +2,7 @@
 // Support for document objects.
 //
 
-use crate::svg_render::geometry::Coord;
+use crate::geometry::Coord;
 use crate::svg_writer::Renderable;
 use crate::visualize_core::trifoil;
 use super::super::svg_writer::{TagWriterImpl, TagWriter, TagWriterError};

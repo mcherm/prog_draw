@@ -6,6 +6,7 @@ mod macos_text_size;
 mod svg_writer;
 mod tidy_tree;
 mod data_tree;
+mod geometry;
 
 use text_size::set_system_text_sizer;
 

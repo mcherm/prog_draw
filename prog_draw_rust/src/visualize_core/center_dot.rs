@@ -1,5 +1,6 @@
-use super::super::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
-use super::super::svg_render::{SvgPositioned, geometry::Rect};
+use crate::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
+use crate::svg_render::SvgPositioned;
+use crate::geometry::Rect;
 use crate::visualize_core::document::CENTER_DOT_RADIUS;
 
 
