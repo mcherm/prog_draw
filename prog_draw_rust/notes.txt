@@ -1,7 +1,6 @@
 Layout Libraries:
 
-I liked the look of tidy-tree ( https://github.com/zxch3n/tidy ) but I couldn't get it to work without a level
-of messing-with-it-by-hand that I couldn't stomach.
-
-I'm trying id-tree-layout instead. ( https://crates.io/crates/id_tree_layout )
+I liked the look of tidy-tree ( https://github.com/zxch3n/tidy ) and eventually I got it to work
+after making a few changes. I'd rather use it from crates.io but it isn't published
+there yet.
 

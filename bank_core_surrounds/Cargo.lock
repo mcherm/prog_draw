@@ -216,12 +216,9 @@ dependencies = [
 name = "prog_draw"
 version = "0.1.2"
 dependencies = [
- "csv",
- "itertools",
  "lazy_static",
  "num",
  "rusttype",
- "wasm-bindgen",
 ]
 
 [[package]]
