@@ -7,7 +7,7 @@ use prog_draw::svg_writer::Renderable;
 use crate::trifoil;
 use prog_draw::svg_writer::{TagWriterImpl, TagWriter, TagWriterError};
 use prog_draw::svg_render::{Group, Svg, SvgPositioned};
-use crate::capability_tree::CapabilityNodeTree;
+use crate::capability_tree::{CapabilityData, CapabilityNodeTree};
 use crate::center_dot::CenterDot;
 
 
@@ -58,11 +58,19 @@ impl TwoTreeViewDocument {
     }
 
     /// Return the contents of this document as an SVG string.
-    #[allow(dead_code)] // FIXME: Later we will use this. Still working before that's ready to go
     pub fn get_svg_str(&self) -> Result<String,TagWriterError> {
         let mut output: MyString = MyString{s:String::new()};
-        self.output_to(&mut output)?; // FIXME: Wrong args; here and elsewhere
+        self.output_to(&mut output)?;
         Ok(output.s)
+    }
+
+    /// Returns the CapabilityData with that node_id if it exists; None if not.
+    pub fn get_node_data(&self, id: &str) -> Option<&CapabilityData> {
+        // NOTE: The tricky bit is that it could be in either tree (and we don't care which it's in)
+        match self.core_tree.find_data_by_id(id) {
+            Some(data) => Some(data),
+            None => self.surround_tree.find_data_by_id(id),
+        }
     }
 
     pub fn output_to(&self, output: &mut dyn std::io::Write) -> Result<(),TagWriterError> {
@@ -88,7 +96,6 @@ impl TwoTreeViewDocument {
     }
 
     /// Toggles the collapsed state of a node. Leaf and Root nodes are unaffected.
-    #[allow(dead_code)]
     pub fn toggle_collapse(&mut self, node_id: &str) {
         let should_layout_core_tree = self.core_tree.toggle_collapse(node_id);
         let should_layout_surround_tree = self.surround_tree.toggle_collapse(node_id);

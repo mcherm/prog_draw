@@ -6,6 +6,7 @@
     </head>
     <body>
         <div id="svg_container"></div>
+        <div id="modal_parent"></div>
         <script type="module">
             window.log = function(s) {
                 console.log(s);
@@ -22,16 +23,25 @@
             window.get_text_height = function(text, font) {
                 return parseFloat(font)
             }
+            window.remove_by_id = function(id) {
+                document.getElementById(id).remove();
+            }
             // For both of those, "12.4px Arial" is an example of a font value.
 
 
-            import init, {get_svg, toggle_node, initialize} from "./pkg/bank_core_surrounds.js";
+            import init, {initialize, get_style, get_svg, toggle_node, show_node} from "./pkg/bank_core_surrounds.js";
             window.toggle_then_draw = function(id) {
                 document.getElementById("svg_container").innerHTML = toggle_node(id);
             };
+            window.show_node_data = function(id) {
+                document.getElementById("modal_parent").innerHTML = show_node(id);
+            }
             init()
                 .then(() => {
                     initialize();
+                    const style = document.createElement('style');
+                    document.head.appendChild(style);
+                    style.appendChild(document.createTextNode(get_style()))
                     document.getElementById("svg_container").innerHTML = get_svg();
                 });
         </script>

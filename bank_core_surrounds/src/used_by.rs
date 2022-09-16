@@ -33,6 +33,18 @@ impl From<&str> for UsedBy {
     }
 }
 
+impl From<UsedBy> for &'static str {
+    fn from(x: UsedBy) -> &'static str {
+        match x {
+            UsedBy::Yes => "Yes",
+            UsedBy::No => "No",
+            UsedBy::Maybe => "Maybe",
+            UsedBy::Blank => "",
+            UsedBy::Mixed => "Mixed",
+        }
+    }
+}
+
 
 impl UsedBySet {
     /// Returns a UsedBy where everything is "Mixed".

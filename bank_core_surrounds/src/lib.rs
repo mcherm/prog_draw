@@ -5,6 +5,7 @@ mod used_by;
 mod capability_tree;
 mod center_dot;
 mod document;
+mod capability_html;
 
 
 
@@ -49,6 +50,10 @@ pub fn initialize() {
     }
 }
 
+#[wasm_bindgen]
+pub fn get_style() -> String {
+    capability_html::style().into()
+}
 
 #[wasm_bindgen]
 pub fn get_svg() -> String {
@@ -62,6 +67,13 @@ pub fn get_svg() -> String {
 pub fn toggle_node(node_id: String) -> String {
     global_document().lock().unwrap().toggle_collapse(node_id.as_str());
     get_svg()
+}
+
+#[wasm_bindgen]
+pub fn show_node(node_id: String) -> String {
+    capability_html::as_html(
+        global_document().lock().unwrap().get_node_data(&node_id).unwrap()
+    )
 }
 
 

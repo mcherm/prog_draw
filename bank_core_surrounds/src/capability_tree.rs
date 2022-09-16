@@ -33,14 +33,14 @@ pub enum CoreOrSurround {
 
 #[derive(Debug, Clone)]
 pub struct CapabilityData {
-    id_str: String,
-    parent_id: String,
-    text: String,
-    used_by_set: UsedBySet,
-    description: String,
-    core_surround: CoreOrSurround,
-    notes: String,
-    collapsed: bool,
+    pub id: String,
+    pub parent_id: String,
+    pub text: String,
+    pub used_by_set: UsedBySet,
+    pub description: String,
+    pub core_surround: CoreOrSurround,
+    pub notes: String,
+    pub collapsed: bool,
     location: (f64, f64),
     node_loc_style: NodeLocationStyle,
 }
@@ -82,6 +82,18 @@ impl From<&str> for CoreOrSurround {
     }
 }
 
+impl From<CoreOrSurround> for &'static str {
+    fn from(x: CoreOrSurround) -> &'static str {
+        match x {
+            CoreOrSurround::Core => "Core",
+            CoreOrSurround::Surround => "Surround",
+            CoreOrSurround::NotSure => "Not Sure",
+            CoreOrSurround::Blank => "",
+            CoreOrSurround::Mixed => "Mixed",
+        }
+    }
+}
+
 
 impl CapabilityData {
     fn new(
@@ -98,7 +110,7 @@ impl CapabilityData {
         let location = (0.0, 0.0); // default location until it gets repositioned
         let node_loc_style = NodeLocationStyle::BranchNode; // everything is assumed to be a branch until proven otherwise
         CapabilityData {
-            id_str, parent_id, text,
+            id: id_str, parent_id, text,
             used_by_set, description, core_surround,
             notes, collapsed, location, node_loc_style
         }
@@ -173,7 +185,7 @@ impl Renderable for CapabilityData {
                 control_cx: loc_x + box_width * right_left,
                 control_cy: loc_y,
                 fill: (if self.collapsed {"#000000"} else {"#FFFFFF"}).to_string(),
-                onclick: format_args!("toggle_then_draw('{}')", self.id_str).to_string(),
+                onclick: format!("toggle_then_draw('{}')", self.id).to_string(),
             }),
             (_, _) => None,
         };
@@ -189,6 +201,7 @@ impl Renderable for CapabilityData {
                 ("fill", box_color),
                 ("stroke", "black"),
                 ("stroke-width", &*1.to_string()),
+                ("onclick", &format!("show_node_data('{}')", self.id)),
                 ("class", class)
             ]))?;
             tag_writer.tag_with_text(
@@ -198,7 +211,7 @@ impl Renderable for CapabilityData {
                     ("y", &*text_baseline.to_string()),
                     ("font-family", "Arial"),
                     ("fill", text_color),
-                    ("style", "font-style: normal; font-size: 12.4px"), // FIXME: size for 14 and set this to 12.4 seems to work. WHY?
+                    ("style", "font-style: normal; font-size: 12.4px; pointer-events: none"), // FIXME: size for 14 and set this to 12.4 seems to work. WHY?
                     ("class", class),
                 ]),
                 &self.text
@@ -297,6 +310,21 @@ impl CapabilityNodeTree {
         self.tree.grow_tree(items)
     }
 
+
+    pub fn find_data_by_id<'a>(&'a self, id: &str) -> Option<&'a CapabilityData> {
+        let mut node_stack: Vec<&DTNode<CapabilityData>> = vec![&self.tree];
+        while let Some(node) = node_stack.pop() {
+            if node.data.id == id {
+                return Some(&node.data)
+            } else {
+                for child in node.children.iter() {
+                    node_stack.push(child)
+                }
+            }
+        }
+        return None
+    }
+
     /// Given the ID of a node, this returns the tree node containing that item or None if it doesn't
     /// have one.
     ///
@@ -304,7 +332,7 @@ impl CapabilityNodeTree {
     pub fn find_node_by_id_mut<'a>(&'a mut self, id: &str) -> Option<&'a mut DTNode<CapabilityData>> {
         let mut node_stack: Vec<&'a mut DTNode<CapabilityData>> = vec![&mut self.tree];
         while let Some(node) = node_stack.pop() {
-            if node.data.id_str == id {
+            if node.data.id == id {
                 return Some(node)
             } else {
                 for child in node.children.iter_mut() {
@@ -320,7 +348,7 @@ impl CapabilityNodeTree {
     /// in the tree, stuff like that) then it may panic.
     pub fn add_node(&mut self, data: CapabilityData) {
         match self.find_node_by_id_mut(&data.parent_id) {
-            None => panic!("Cannot add node '{}' with parent id '{}' because the parent is not in the tree.", data.id_str, data.parent_id),
+            None => panic!("Cannot add node '{}' with parent id '{}' because the parent is not in the tree.", data.id, data.parent_id),
             Some(dt_node) => {
                 dt_node.add_child_data(data)
             }
@@ -363,7 +391,7 @@ impl CapabilityNodeTree {
         enum Outcome {NotFound, FoundAndChanged, FoundNoChange}
         /// Internal recursive subroutine.
         fn toggle_collapse_node(node_id: &str, tree_node: &mut DTNode<CapabilityData>) -> Outcome {
-            if &tree_node.data.id_str == node_id {
+            if &tree_node.data.id == node_id {
                 match tree_node.data.node_loc_style {
                     NodeLocationStyle::BranchNode => {
                         tree_node.collapsed = ! tree_node.collapsed;
@@ -484,17 +512,17 @@ fn dummy_data() -> CapabilityNodeTree {
 fn add_to_tidy(nums: &mut NumberMapper, tidy: &mut TidyTree, dtnode: &DTNode<CapabilityData>, parent_id: &str) {
     let data_bbox = dtnode.data.get_bbox();
     // note: width and height are swapped because we want to lay it out sideways not vertically
-    tidy.add_node(nums.get_num(&dtnode.data.id_str), data_bbox.height(), data_bbox.width(), nums.get_num(parent_id));
+    tidy.add_node(nums.get_num(&dtnode.data.id), data_bbox.height(), data_bbox.width(), nums.get_num(parent_id));
     if !dtnode.collapsed {
         for child in dtnode.children.iter() {
-            add_to_tidy(nums, tidy, child, &dtnode.data.id_str);
+            add_to_tidy(nums, tidy, child, &dtnode.data.id);
         }
     }
 }
 
 /// Recursive function used in build_tidy_tree().
 fn populate_locations(nums: &mut NumberMapper, dtnode: &mut DTNode<CapabilityData>, locations: &HashMap<usize, (f64, f64)>) {
-    match locations.get(&nums.get_num(&dtnode.data.id_str)) {
+    match locations.get(&nums.get_num(&dtnode.data.id)) {
         None => panic!("All locations should be set but aren't."),
         Some((x,y)) => dtnode.data.location = (*y, *x),
     }
@@ -705,12 +733,11 @@ pub fn read_csv_from_db_reader<R: std::io::Read>(reader: &mut csv::Reader<R>) ->
         }
 
         // --- Create capability ---
-        let used_by_set = UsedBySet::from_fields(used_by_consumer, used_by_sbb, used_by_commercial); // FIXME: Create a struct!
+        let used_by_set = UsedBySet::from_fields(used_by_consumer, used_by_sbb, used_by_commercial);
         let collapsed = false;
         let capability_data = CapabilityData::new_new(id, parent_id, name, used_by_set, description, core_surround, notes, collapsed);
 
         // --- Add to one or both trees ---
-        // capability_data_by_id.insert(id.to_string(), capability_data.clone()); FIXME: Remove
         match capability_data.core_surround {
             CoreOrSurround::Core => {
                 core_tree.add_node(capability_data);
