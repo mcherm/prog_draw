@@ -1,0 +1,14 @@
+Id,ParentId,Name,Level,TreePosition,Description,Core/Surround,Notes,UsedByConsumer,UsedBySBB,UsedByCommercial
+ROOT,,,0,Root,,Mixed,,Mixed,Mixed,Mixed
+BC1,ROOT,Account Management,1,Branch,Support for management of non-financial account information.,Mixed,,Mixed,Mixed,Mixed
+BC2,BC1,Administer Accounts,2,Branch,,Mixed,,Yes,Yes,Yes
+BC3,BC2,Enact a status on accounts,3,Leaf,"Typically applying status to an account which impacts restrictions and other allowed operations. Includes status like bankruptcy, deceased, etc. Some are customer-level but arte stored at the account level.",Core,,Yes,Yes,Yes
+BC4,BC2,Enact a status on transactions,3,Leaf,Typically applying a hold to a transaction,Core,,Yes,Yes,Yes
+BC5,BC2,Link overdraft protection,3,Leaf,link an overdraft LOC to a deposit or savings account,Core,,Yes,Yes,Yes
+BC7,BC2,Maintain Account Information,3,Leaf,Manual and batch/stream maintanence of account level fields,Core,,Yes,Yes,Yes
+BC497,BC2,"Add and Remove Stops, Holds, and Special Instructions",3,Leaf,"Ability to add/Delete Stop, Holds, Special Instructions at the Account and Transaction level",Surround,,Yes,Yes,Yes
+BC498,BC2,Maintain Aaccount information,3,Leaf,Ability to service at the account level,Surround,,Yes,Yes,Yes
+BC106,ROOT,Cash Management,1,Branch,All sweeping.,Mixed,,Mixed,Mixed,Mixed
+BC107,BC106,Controlled Disbursement,2,Branch,Provides early presentment of checks to clients so that funds can be moved to fund the checks by end of day.,Surround,,No,Yes,Yes
+BC108,BC107,Balance Controlled Disbursement Accounts,3,Leaf,"Transfer funds automatically from funding account to disbursement account t ocover daily amount owed by client, and ensure disbursement account has a zero balance at end of day processing by transferring excess funds into the funding account.",Surround,Possibly need a base product in the core but features related to movement and order of funds could be in a surround.,No,Yes,Yes
+BC109,BC107,Maintain Controlled Disbursement Accounts,3,Leaf,Long description here.,Surround,,No,Yes,Yes

@@ -89,7 +89,7 @@ impl TwoTreeViewDocument {
 
     /// Toggles the collapsed state of a node. Leaf and Root nodes are unaffected.
     #[allow(dead_code)]
-    pub fn toggle_collapse(&mut self, node_id: usize) {
+    pub fn toggle_collapse(&mut self, node_id: &str) {
         let should_layout_core_tree = self.core_tree.toggle_collapse(node_id);
         let should_layout_surround_tree = self.surround_tree.toggle_collapse(node_id);
 

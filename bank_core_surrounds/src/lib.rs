@@ -1,7 +1,7 @@
 
 mod trifoil;
 mod fold_up;
-mod lob_usage;
+mod used_by;
 mod capability_tree;
 mod center_dot;
 mod document;
@@ -11,7 +11,7 @@ mod document;
 use std::sync::{Mutex, Once};
 use std::borrow::BorrowMut;
 use document::TwoTreeViewDocument;
-use capability_tree::read_csv_from_str;
+use capability_tree::read_csv_from_bokor_str;
 use prog_draw::text_size;
 use wasm_bindgen::prelude::*;
 
@@ -59,18 +59,29 @@ pub fn get_svg() -> String {
 }
 
 #[wasm_bindgen]
-pub fn toggle_node(node_id: u32) -> String {
-    global_document().lock().unwrap().toggle_collapse(node_id.try_into().unwrap());
+pub fn toggle_node(node_id: String) -> String {
+    global_document().lock().unwrap().toggle_collapse(node_id.as_str());
     get_svg()
 }
 
 
-pub fn get_two_tree_view() -> Result<TwoTreeViewDocument,std::io::Error> {
+#[allow(dead_code)] // FIXME: Remove this and everything it calls someday... but not yet.
+pub fn get_two_tree_view_old() -> Result<TwoTreeViewDocument,std::io::Error> {
     // --- Read in the file saying what to ignore due to folding ---
     let fold_info = fold_up::read_fold_info_from_str(include_str!("../input/fold_up.csv"))?;
 
     // --- read the nodes ---
-    let [core_tree, surround_tree] = read_csv_from_str(include_str!("../input/core_surrounds.csv"), fold_info)?;
+    let [core_tree, surround_tree] = read_csv_from_bokor_str(include_str!("../input/core_surrounds.csv"), fold_info)?;
+
+    // --- Create the document ---
+    let answer = Ok(TwoTreeViewDocument::new(core_tree, surround_tree));
+    answer
+}
+
+pub fn get_two_tree_view() -> Result<TwoTreeViewDocument,std::io::Error> {
+    // --- read the nodes ---
+    let data = include_str!("../input/capabilities_db - Capabilities.csv");
+    let [core_tree, surround_tree] = capability_tree::read_csv_from_db_str(data)?;
 
     // --- Create the document ---
     let answer = Ok(TwoTreeViewDocument::new(core_tree, surround_tree));
