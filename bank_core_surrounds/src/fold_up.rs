@@ -45,6 +45,7 @@ pub fn read_fold_info_from_reader<R: std::io::Read>(reader: &mut csv::Reader<R>)
     Ok(FoldInfo{fold_paths})
 }
 
+#[allow(dead_code)] // FIXME: Maybe I delete this? Am I done with the fold_info?
 pub fn read_fold_info_from_str(data: &str) -> Result<FoldInfo, io::Error> {
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)
@@ -52,7 +53,7 @@ pub fn read_fold_info_from_str(data: &str) -> Result<FoldInfo, io::Error> {
     read_fold_info_from_reader(&mut reader)
 }
 
-#[allow(dead_code)]
+#[allow(dead_code)] // FIXME: Maybe I delete this? Am I done with the fold_info?
 pub fn read_fold_info_from_file(filename: &str) -> Result<FoldInfo, io::Error> {
     let mut reader = csv::ReaderBuilder::new()
         .has_headers(false)

@@ -3,6 +3,7 @@ mod trifoil;
 mod fold_up;
 mod used_by;
 mod capability_tree;
+mod capability_db;
 mod center_dot;
 mod document;
 mod capability_html;
@@ -76,37 +77,18 @@ pub fn show_node(node_id: String) -> String {
     )
 }
 
-
-#[allow(dead_code)] // FIXME: Remove this and everything it calls someday... but not yet.
-pub fn get_two_tree_view_old() -> Result<TwoTreeViewDocument,std::io::Error> {
-    // --- Read in the file saying what to ignore due to folding ---
-    let fold_info = fold_up::read_fold_info_from_str(include_str!("../input/fold_up.csv"))?;
-
-    // --- read the nodes ---
-    let [core_tree, surround_tree] = read_csv_from_bokor_str(include_str!("../input/core_surrounds.csv"), fold_info)?;
-
-    // --- Create the document ---
-    let answer = Ok(TwoTreeViewDocument::new(core_tree, surround_tree));
-    answer
-}
-
-pub fn get_two_tree_view() -> Result<TwoTreeViewDocument,std::io::Error> {
-    // --- read the nodes ---
-    let data = include_str!("../input/capabilities_db - Capabilities.csv");
-    let [core_tree, surround_tree] = capability_tree::read_csv_from_db_str(data)?;
+pub fn get_initial_document() -> TwoTreeViewDocument {
+    // --- read the data ---
+    let db_or_err = capability_db::read_db(include_bytes!("../input/capabilities_db.xlsx"));
+    let capdb: capability_db::CapabilitiesDB = match db_or_err {
+        Ok(capdb) => capdb,
+        Err(err) => panic!("{}", err), // it's read at compile time, so handle errors with a panic.
+    };
 
     // --- Create the document ---
-    let answer = Ok(TwoTreeViewDocument::new(core_tree, surround_tree));
-    answer
+    TwoTreeViewDocument::new(capdb)
 }
 
-
-fn get_initial_document() -> TwoTreeViewDocument {
-    match get_two_tree_view() {
-        Ok(doc) => doc,
-        Err(_) => panic!("Invalid document"),
-    }
-}
 
 
 static mut GLOBAL_DOCUMENT: Option<Mutex<TwoTreeViewDocument>> = None;

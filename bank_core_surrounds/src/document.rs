@@ -4,10 +4,10 @@
 
 use prog_draw::geometry::Coord;
 use prog_draw::svg_writer::Renderable;
-use crate::trifoil;
 use prog_draw::svg_writer::{TagWriterImpl, TagWriter, TagWriterError};
 use prog_draw::svg_render::{Group, Svg, SvgPositioned};
-use crate::capability_tree::{CapabilityData, CapabilityNodeTree};
+use crate::{capability_db, trifoil};
+use crate::capability_tree::{CapabilityData, CapabilityNodeTree, read_trees_from_capdb};
 use crate::center_dot::CenterDot;
 
 
@@ -49,11 +49,15 @@ impl std::io::Write for MyString {
 
 
 impl TwoTreeViewDocument {
-    pub fn new(mut core_tree: CapabilityNodeTree, mut surround_tree: CapabilityNodeTree) -> Self {
+    pub fn new(capdb: capability_db::CapabilitiesDB) -> Self {
+        // --- get trees ---
+        let [mut core_tree, mut surround_tree] = read_trees_from_capdb(capdb);
+
         // --- perform layout ---
         core_tree.layout();
         surround_tree.layout();
 
+        // --- return document ---
         TwoTreeViewDocument{core_tree, surround_tree}
     }
 
@@ -111,4 +115,3 @@ impl TwoTreeViewDocument {
     }
 
 }
-

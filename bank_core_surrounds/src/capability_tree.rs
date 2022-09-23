@@ -11,6 +11,7 @@ use prog_draw::tidy_tree::{NULL_ID, TidyTree};
 use crate::used_by::{UsedBySet, get_color_strs, UsedBy};
 use crate::document::{BASELINE_RISE, COLLAPSE_DOT_RADIUS, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
 use crate::fold_up;
+use crate::capability_db::CapabilitiesDB;
 
 
 
@@ -702,11 +703,52 @@ pub fn read_csv_from_db_str(data: &str) -> Result<[CapabilityNodeTree; 2], std::
 
 /// Returns the core tree and the surrounds tree
 ///
+/// NOTE: This panics if the format isn't as expected. Probably OK since it is 'read'
+/// at compile-time.
+pub fn read_trees_from_capdb(capdb: CapabilitiesDB) -> [CapabilityNodeTree; 2] {
+    // --- Create two of them for the two trees ---
+    let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::JavaScriptReplace);
+    let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::JavaScriptReplace);
+
+    // --- Start reading the capabilities ---
+    for row in capdb.capabilities.iter() {
+        // --- Skip root ---
+        if row.id == "ROOT" {
+            continue;
+        }
+
+        // --- Create capability ---
+        let used_by_set = UsedBySet::from_fields(row.used_by_consumer, row.used_by_sbb, row.used_by_commercial);
+        let collapsed = false;
+        let capability_data = CapabilityData::new_new(
+            &row.id, &row.parent_id, &row.name, used_by_set, &row.description,
+            row.core_surround, &row.notes, collapsed
+        );
+
+        // --- Add to one or both trees ---
+        match capability_data.core_surround {
+            CoreOrSurround::Core => {
+                core_tree.add_node(capability_data);
+            }
+            CoreOrSurround::Surround => {
+                surround_tree.add_node(capability_data);
+            }
+            CoreOrSurround::Blank | CoreOrSurround::NotSure | CoreOrSurround::Mixed => {
+                core_tree.add_node(capability_data.clone());
+                surround_tree.add_node(capability_data);
+            }
+        }
+    }
+
+    // --- Return the result ---
+    [core_tree, surround_tree]
+}
+
+
+/// Returns the core tree and the surrounds tree
+///
 /// FIXME: This panics if the format isn't as expected. Should be made more robust.
 pub fn read_csv_from_db_reader<R: std::io::Read>(reader: &mut csv::Reader<R>) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
-    // --- We'll store this while we work for when we don't know which tree a branch is needed in ---
-    // let mut capability_data_by_id: HashMap<String, CapabilityData> = HashMap::new(); // FIXME: Remove
-
     // --- Create two of them for the two trees ---
     let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::JavaScriptReplace);
     let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::JavaScriptReplace);
