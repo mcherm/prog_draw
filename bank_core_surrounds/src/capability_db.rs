@@ -39,8 +39,32 @@ pub struct CapabilitiesRow {
 pub struct SurroundSheetRow {
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 pub struct SurroundRow {
+    #[serde(rename(deserialize = "Id"))]
+    pub id: String,
+    #[serde(default, rename(deserialize = "Name"))]
+    pub name: String,
+    #[serde(rename(deserialize = "IsCore"), deserialize_with = "deserialize_yes_no")]
+    pub is_core: bool,
+    #[serde(rename(deserialize = "IsNewSystem"), deserialize_with = "deserialize_yes_no")]
+    pub is_new_system: bool,
+    #[serde(rename(deserialize = "IsCurrent"), deserialize_with = "deserialize_yes_no")]
+    pub is_current: bool,
+    #[serde(rename(deserialize = "IsDestination"), deserialize_with = "deserialize_yes_no")]
+    pub is_destination: bool,
+    #[serde(rename(deserialize = "ConsumerCurrent"), deserialize_with = "deserialize_yes_no")]
+    pub consumer_current: bool,
+    #[serde(rename(deserialize = "SBBCurrent"), deserialize_with = "deserialize_yes_no")]
+    pub sbb_current: bool,
+    #[serde(rename(deserialize = "CommercialCurrent"), deserialize_with = "deserialize_yes_no")]
+    pub commercial_current: bool,
+    #[serde(rename(deserialize = "ConsumerDestination"), deserialize_with = "deserialize_yes_no")]
+    pub consumer_destination: bool,
+    #[serde(rename(deserialize = "SBBDestination"), deserialize_with = "deserialize_yes_no")]
+    pub sbb_destination: bool,
+    #[serde(rename(deserialize = "CommercialDestination"), deserialize_with = "deserialize_yes_no")]
+    pub commercial_destination: bool,
 }
 
 /// An object that contains all the data from the Capabilities DB file.
@@ -74,6 +98,25 @@ fn deserialize_used_by<'de, D>(deserializer: D) -> Result<UsedBy,D::Error>
         Ok(calamine::DataType::String(s)) => {
             let st: &str = &s;
             Ok(UsedBy::from(st))
+        },
+        Ok(_) => panic!("Blank or non-string field in UsedBy."), // FIXME: should return err, but I don't know how
+        Err(e) => Err(e),
+    }
+}
+
+
+fn deserialize_yes_no<'de, D>(deserializer: D) -> Result<bool,D::Error>
+    where D: serde::Deserializer<'de>
+{
+    let data_type = calamine::DataType::deserialize(deserializer);
+    match data_type {
+        Ok(calamine::DataType::String(s)) => {
+            let st: &str = &s;
+            match st {
+                "Yes" => Ok(true),
+                "No" => Ok(false),
+                _ => panic!("String other than 'Yes' or 'No' used for boolean."),
+            }
         },
         Ok(_) => panic!("Blank or non-string field in UsedBy."), // FIXME: should return err, but I don't know how
         Err(e) => Err(e),

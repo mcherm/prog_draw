@@ -6,6 +6,7 @@
 // mod center_dot;
 // mod document;
 // mod capability_html;
+// mod surrounds;
 //
 //
 // use calamine::Error;
@@ -27,10 +28,12 @@
 //         Ok(capdb) => capdb,
 //         Err(err) => panic!("{}", err), // it's read at compile time, so handle errors with a panic.
 //     };
-//     let document = document::TwoTreeViewDocument::new(capdb);
+//     let document = document::TwoTreeViewDocument::new(&capdb);
 //
 //     // --- print it ---
-//     println!("Document: {:?}", document);
+//     for surround in capdb.surrounds {
+//         println!("{}: {}", surround.name, surround.is_core)
+//     }
 //     println!("END");
 //     Ok(())
 // }

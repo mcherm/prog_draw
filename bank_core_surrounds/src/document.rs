@@ -9,14 +9,18 @@ use prog_draw::svg_render::{Group, Svg, SvgPositioned};
 use crate::{capability_db, trifoil};
 use crate::capability_tree::{CapabilityData, CapabilityNodeTree, read_trees_from_capdb};
 use crate::center_dot::CenterDot;
+use crate::surrounds::SurroundItems;
 
 
 pub const TEXT_ITEM_PADDING: Coord = 2.0;
 pub const BASELINE_RISE: Coord = 2.0;
 pub const NODE_ITEM_ROUND_CORNER: Coord = 3.0;
-pub const CENTER_DOT_RADIUS: Coord = 16.0;
+pub const CENTER_DOT_RADIUS: Coord = 40.0;
 pub const COLLAPSE_DOT_RADIUS: Coord = 3.0;
-pub const SVG_MARGIN: Coord = 0.0;
+pub const ITEM_SPACING: Coord = 8.0; // min vertical space between adjacent boxes
+pub const LAYER_SPACING: Coord = 16.0; // min horizontal space between layers in tree
+pub const SPACING_TO_SURROUNDS: Coord = 3.0 * LAYER_SPACING;
+pub const SVG_MARGIN: Coord = 4.0;
 
 
 
@@ -24,6 +28,7 @@ pub const SVG_MARGIN: Coord = 0.0;
 pub struct TwoTreeViewDocument {
     core_tree: CapabilityNodeTree,
     surround_tree: CapabilityNodeTree,
+    surrounds: SurroundItems,
 }
 
 
@@ -49,16 +54,18 @@ impl std::io::Write for MyString {
 
 
 impl TwoTreeViewDocument {
-    pub fn new(capdb: capability_db::CapabilitiesDB) -> Self {
-        // --- get trees ---
+    pub fn new(capdb: &capability_db::CapabilitiesDB) -> Self {
+        // --- get data objects ---
         let [mut core_tree, mut surround_tree] = read_trees_from_capdb(capdb);
+        let mut surrounds = SurroundItems::new(capdb);
 
         // --- perform layout ---
         core_tree.layout();
         surround_tree.layout();
+        surrounds.layout(&surround_tree);
 
         // --- return document ---
-        TwoTreeViewDocument{core_tree, surround_tree}
+        TwoTreeViewDocument{core_tree, surround_tree, surrounds}
     }
 
     /// Return the contents of this document as an SVG string.
@@ -83,13 +90,15 @@ impl TwoTreeViewDocument {
 
         let core_tree_group = Group::item_transformed(&self.core_tree, Some((shift_dist * -1.0, 0.0)), None);
         let surround_tree_group = Group::item_transformed(&self.surround_tree, Some((shift_dist, 0.0)), None);
+        let surrounds_group = Group::item_transformed(&self.surrounds, Some((shift_dist, 0.0)), None);
         let trifoil_group = Group::item_transformed(&trifoil::Trifoil, Some((0.0, -250.0)), Some(0.5));
 
-        let content: [&dyn SvgPositioned; 4] = [
+        let content: [&dyn SvgPositioned; 5] = [
             &trifoil_group,
             &core_tree_group,
             &surround_tree_group,
             &CenterDot,
+            &surrounds_group,
         ];
         let svg = Svg::new(Group::from(content), SVG_MARGIN);
 
@@ -111,6 +120,7 @@ impl TwoTreeViewDocument {
         }
         if should_layout_surround_tree {
             self.surround_tree.layout();
+            self.surrounds.layout(&self.surround_tree)
         }
     }
 

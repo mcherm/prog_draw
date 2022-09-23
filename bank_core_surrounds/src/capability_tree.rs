@@ -2,14 +2,20 @@
 use std::collections::HashMap;
 use std::cell::Cell;
 use itertools::Itertools;
-use prog_draw::data_tree::{DTNode, DTNodeBuild, DTNodeBuild::{AddData, EndChildren, StartChildren}, InvalidGrowth, LAYOUT_DIRECTION, TreeLayoutDirection};
+use prog_draw::data_tree::{
+    DTNode, DTNodeBuild, InvalidGrowth,TreeLayoutDirection, LAYOUT_DIRECTION,
+    DTNodeBuild::{AddData, EndChildren, StartChildren},
+};
 use prog_draw::svg_render::SvgPositioned;
 use prog_draw::geometry::{Coord, Rect};
 use prog_draw::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
 use prog_draw::text_size::get_system_text_sizer;
 use prog_draw::tidy_tree::{NULL_ID, TidyTree};
 use crate::used_by::{UsedBySet, get_color_strs, UsedBy};
-use crate::document::{BASELINE_RISE, COLLAPSE_DOT_RADIUS, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
+use crate::document::{
+    BASELINE_RISE, COLLAPSE_DOT_RADIUS, NODE_ITEM_ROUND_CORNER,
+    TEXT_ITEM_PADDING, LAYER_SPACING, ITEM_SPACING
+};
 use crate::fold_up;
 use crate::capability_db::CapabilitiesDB;
 
@@ -191,6 +197,8 @@ impl Renderable for CapabilityData {
             (_, _) => None,
         };
 
+        assert_eq!(box_width, self.get_bbox().width()); // FIXME: Remove... but this is useful.
+
         // --- draw it ---
         if self.node_loc_style != NodeLocationStyle::RootNode {
             tag_writer.single_tag("rect", Attributes::from([
@@ -238,9 +246,10 @@ impl Renderable for CapabilityData {
 
 
 impl SvgPositioned for CapabilityData {
-    // Gives the bounding box for the node including text AND the box around it. Remember, if
-    // the node isn't correctly positioned yet, its location will be (0,0). Also know that
-    // self.location is the center-left of the box it occupies.
+    /// Gives the bounding box for the node including text AND the box around it. Remember, if
+    /// the node isn't correctly positioned yet, its location will be (0,0). Also know that
+    /// self.location is the center-left or center-right of the box it occupies (depending
+    /// on LAYOUT_DIRECTION).
     fn get_bbox(&self) -> Rect {
         let center = self.location;
         let (text_width, text_height) = self.text_size();
@@ -361,7 +370,7 @@ impl CapabilityNodeTree {
         // --- use tidy-tree to lay it out ---
         let mut nums = NumberMapper::new();
         nums.set("", NULL_ID);
-        let mut tidy = TidyTree::with_tidy_layout(16.0, 8.0);
+        let mut tidy = TidyTree::with_tidy_layout(LAYER_SPACING, ITEM_SPACING);
         LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
         add_to_tidy(&mut nums, &mut tidy, &self.tree, "");
         tidy.layout();
@@ -705,7 +714,7 @@ pub fn read_csv_from_db_str(data: &str) -> Result<[CapabilityNodeTree; 2], std::
 ///
 /// NOTE: This panics if the format isn't as expected. Probably OK since it is 'read'
 /// at compile-time.
-pub fn read_trees_from_capdb(capdb: CapabilitiesDB) -> [CapabilityNodeTree; 2] {
+pub fn read_trees_from_capdb(capdb: &CapabilitiesDB) -> [CapabilityNodeTree; 2] {
     // --- Create two of them for the two trees ---
     let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::JavaScriptReplace);
     let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::JavaScriptReplace);

@@ -7,6 +7,7 @@ mod capability_db;
 mod center_dot;
 mod document;
 mod capability_html;
+mod surrounds;
 
 
 
@@ -86,7 +87,7 @@ pub fn get_initial_document() -> TwoTreeViewDocument {
     };
 
     // --- Create the document ---
-    TwoTreeViewDocument::new(capdb)
+    TwoTreeViewDocument::new(&capdb)
 }
 
 
