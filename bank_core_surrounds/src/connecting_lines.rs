@@ -55,12 +55,17 @@ impl ConnectingLines {
             if node.children.is_empty() || node.collapsed {
                 // --- it's "leaf" (as visible on the screen now) ---
                 for (surround_name, used_by_set) in doc.capdb.get_related_surrounds(&node.data.id) {
-                    let color = get_color_strs(&used_by_set).0;
                     let cap_bbox = node.get_bbox();
                     let start: Point = (cap_bbox.right(), cap_bbox.center_y());
-                    let surround = doc.surrounds.get_by_name(surround_name).expect("Surround not found.");
+                    let surround_opt = doc.surrounds.get_by_name(surround_name);
+                    if surround_opt.is_none() {
+                        println!("Could not find a surround named '{}' which is mentioned in {}. Skipped.", surround_name, node.data.id);
+                        continue;
+                    }
+                    let surround = surround_opt.expect("Surround not found.");
                     let sur_bbox = surround.get_bbox();
                     let end: Point = (sur_bbox.left(), sur_bbox.center_y());
+                    let color = get_color_strs(&used_by_set).0;
                     let line: Line = Line{start, end, color};
                     lines.push(line)
                 }
