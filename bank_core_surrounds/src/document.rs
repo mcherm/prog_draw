@@ -6,6 +6,7 @@ use prog_draw::geometry::Coord;
 use prog_draw::svg_writer::Renderable;
 use prog_draw::svg_writer::{TagWriterImpl, TagWriter, TagWriterError};
 use prog_draw::svg_render::{Group, Svg, SvgPositioned};
+use prog_draw::geometry::Point;
 use crate::trifoil;
 use crate::capability_db::CapabilitiesDB;
 use crate::capability_tree::{CapabilityData, CapabilityNodeTree, read_trees_from_capdb};
@@ -24,6 +25,8 @@ pub const ITEM_SPACING: Coord = 8.0; // min vertical space between adjacent boxe
 pub const LAYER_SPACING: Coord = 16.0; // min horizontal space between layers in tree
 pub const SPACING_TO_SURROUNDS: Coord = 3.0 * LAYER_SPACING;
 pub const SVG_MARGIN: Coord = 4.0;
+pub const TRIFOIL_SCALE: Coord = 0.5;
+pub const TRIFOIL_MARGIN: Coord = 80.0;
 
 
 
@@ -37,12 +40,12 @@ pub struct TwoTreeViewDocument {
 }
 
 
-// FIXME: This part shouldn't be needed
-struct MyString {
+// FIXME: This part should be in the std library, right?
+struct WritableString {
     s: String,
 }
 
-impl std::io::Write for MyString {
+impl std::io::Write for WritableString {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         let new_str = match std::str::from_utf8(buf) {
             Ok(s) => s,
@@ -77,7 +80,7 @@ impl TwoTreeViewDocument {
 
     /// Return the contents of this document as an SVG string.
     pub fn get_svg_str(&self) -> Result<String,TagWriterError> {
-        let mut output: MyString = MyString{s:String::new()};
+        let mut output: WritableString = WritableString {s:String::new()};
         self.output_to(&mut output)?;
         Ok(output.s)
     }
@@ -98,8 +101,8 @@ impl TwoTreeViewDocument {
         let core_tree_group = Group::item_transformed(&self.core_tree, Some((shift_dist * -1.0, 0.0)), None);
         let surround_tree_group = Group::item_transformed(&self.surround_tree, Some((shift_dist, 0.0)), None);
         let surrounds_group = Group::item_transformed(&self.surrounds, Some((shift_dist, 0.0)), None);
-        let trifoil_group = Group::item_transformed(&trifoil::Trifoil, Some((0.0, -250.0)), Some(0.5));
         let connecting_lines_group = Group::item_transformed(&self.connecting_lines, Some((shift_dist, 0.0)), None);
+        let trifoil_group = Group::item_transformed(&trifoil::Trifoil, Some(self.trifoil_position()), Some(TRIFOIL_SCALE));
 
         let content: [&dyn SvgPositioned; 6] = [
             &trifoil_group,
@@ -137,4 +140,19 @@ impl TwoTreeViewDocument {
         }
     }
 
+    /// This finds a good place to put the key. It returns an (x,y) offset from the center
+    /// that would be good to move it to.
+    fn trifoil_position(&self) -> Point {
+        let trifoil_bbox = trifoil::Trifoil.get_bbox().scaled_about_center(TRIFOIL_SCALE);
+        let left_top = self.core_tree.get_bbox().top();
+        let right_top = self.surround_tree.get_bbox().top();
+        let best_top = left_top.max(right_top);
+        let y_position = best_top + -trifoil_bbox.bottom() - TRIFOIL_MARGIN;
+        let x_position = if left_top >= right_top {
+            -trifoil_bbox.left() + TRIFOIL_MARGIN
+        } else {
+            trifoil_bbox.left() - TRIFOIL_MARGIN
+        };
+        (x_position, y_position)
+    }
 }

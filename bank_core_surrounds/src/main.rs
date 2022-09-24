@@ -30,6 +30,7 @@ fn main() -> Result<(), Error> {
         Err(err) => panic!("{}", err), // it's read at compile time, so handle errors with a panic.
     };
     let document = document::TwoTreeViewDocument::new(capdb);
+    document.get_svg_str();
 
     // --- print it ---
     println!("END");
