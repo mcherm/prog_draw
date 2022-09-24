@@ -10,6 +10,9 @@ use crate::capability_tree::CoreOrSurround;
 use crate::used_by::{UsedBy, UsedBySet};
 
 
+const NOT_REALLY_SURROUNDS: [&str; 2] = ["Destination Core", "N/A"];
+
+
 #[derive(Deserialize, Debug)]
 pub struct CapabilitiesRow {
     #[serde(rename(deserialize = "Id"))]
@@ -258,6 +261,9 @@ impl CapabilitiesDB {
         unique_names.extend(ssr_row.sbb_destination.names.iter().map(|x| x.as_str()));
         unique_names.extend(ssr_row.commercial_destination.names.iter().map(|x| x.as_str()));
         for surround_name in unique_names {
+            if NOT_REALLY_SURROUNDS.contains(&surround_name) {
+                continue; // skip these special names
+            }
             fn ub(sl: &SurroundList, name: &str) -> UsedBy {
                 if sl.names.iter().any(|x| x.as_str() == name) {
                     UsedBy::Yes
