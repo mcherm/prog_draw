@@ -46,6 +46,14 @@ impl From<UsedBy> for &'static str {
 }
 
 
+impl Default for UsedBy {
+    /// Default to "Blank", mostly so serde can read from excel.
+    fn default() -> Self {
+        UsedBy::Blank
+    }
+}
+
+
 impl UsedBySet {
     /// Returns a UsedBy where everything is "Mixed".
     pub fn all_mixed() -> Self {

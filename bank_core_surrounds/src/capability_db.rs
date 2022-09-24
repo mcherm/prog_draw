@@ -22,15 +22,15 @@ pub struct CapabilitiesRow {
     pub level: i32,
     #[serde(default, rename(deserialize = "Description"))]
     pub description: String,
-    #[serde(rename(deserialize = "Core/Surround"), deserialize_with = "deserialize_core_surround")]
+    #[serde(default, rename(deserialize = "Core/Surround"), deserialize_with = "deserialize_core_surround")]
     pub core_surround: CoreOrSurround,
     #[serde(default, rename(deserialize = "Notes"))]
     pub notes: String,
-    #[serde(rename(deserialize = "UsedByConsumer"), deserialize_with = "deserialize_used_by")]
+    #[serde(default, rename(deserialize = "UsedByConsumer"), deserialize_with = "deserialize_used_by")]
     pub used_by_consumer: UsedBy,
-    #[serde(rename(deserialize = "UsedBySBB"), deserialize_with = "deserialize_used_by")]
+    #[serde(default, rename(deserialize = "UsedBySBB"), deserialize_with = "deserialize_used_by")]
     pub used_by_sbb: UsedBy,
-    #[serde(rename(deserialize = "UsedByCommercial"), deserialize_with = "deserialize_used_by")]
+    #[serde(default, rename(deserialize = "UsedByCommercial"), deserialize_with = "deserialize_used_by")]
     pub used_by_commercial: UsedBy,
     #[serde(default, rename(deserialize = "SSRId"))]
     pub ssr_id: Option<String>,
@@ -46,19 +46,19 @@ pub struct SurroundSheetRow {
     pub description: String,
     #[serde(default, rename(deserialize = "Notes"))]
     pub notes: String,
-    #[serde(rename(deserialize = "CoreOrSurround"), deserialize_with = "deserialize_surround_list")]
+    #[serde(default, rename(deserialize = "CoreOrSurround"), deserialize_with = "deserialize_surround_list")]
     pub core_surround: SurroundList,
-    #[serde(rename(deserialize = "ConsumerCurrent"), deserialize_with = "deserialize_surround_list")]
+    #[serde(default, rename(deserialize = "ConsumerCurrent"), deserialize_with = "deserialize_surround_list")]
     pub consumer_current: SurroundList,
-    #[serde(rename(deserialize = "SBBCurrent"), deserialize_with = "deserialize_surround_list")]
+    #[serde(default, rename(deserialize = "SBBCurrent"), deserialize_with = "deserialize_surround_list")]
     pub sbb_current: SurroundList,
-    #[serde(rename(deserialize = "CommercialCurrent"), deserialize_with = "deserialize_surround_list")]
+    #[serde(default, rename(deserialize = "CommercialCurrent"), deserialize_with = "deserialize_surround_list")]
     pub commercial_current: SurroundList,
-    #[serde(rename(deserialize = "ConsumerDestination"), deserialize_with = "deserialize_surround_list")]
+    #[serde(default, rename(deserialize = "ConsumerDestination"), deserialize_with = "deserialize_surround_list")]
     pub consumer_destination: SurroundList,
-    #[serde(rename(deserialize = "SBBDestination"), deserialize_with = "deserialize_surround_list")]
+    #[serde(default, rename(deserialize = "SBBDestination"), deserialize_with = "deserialize_surround_list")]
     pub sbb_destination: SurroundList,
-    #[serde(rename(deserialize = "CommercialDestination"), deserialize_with = "deserialize_surround_list")]
+    #[serde(default, rename(deserialize = "CommercialDestination"), deserialize_with = "deserialize_surround_list")]
     pub commercial_destination: SurroundList,
 }
 
@@ -183,28 +183,36 @@ pub fn read_db(bytes: &[u8]) -> Result<CapabilitiesDB, Error> {
     let mut workbook: Xlsx<_> = Xlsx::new(std::io::Cursor::new(bytes))?;
 
     // --- Read capabilities ---
-    let capabilities_range = workbook.worksheet_range("Capabilities")
+    let range = workbook.worksheet_range("Capabilities")
         .ok_or(Error::Msg("Missing tab 'Capabilities'"))??;
     let capabilities: Vec<CapabilitiesRow> = RangeDeserializerBuilder::new()
-        .from_range::<_, CapabilitiesRow>(&capabilities_range)? // use header names and the bind object
+        .from_range::<_, CapabilitiesRow>(&range)? // use header names and the bind object
         .try_collect()?;
 
     // --- Read surround_sheet_rows ---
-    let capabilities_range = workbook.worksheet_range("SurroundSheetRows")
+    let range = workbook.worksheet_range("SurroundSheetRows")
         .ok_or(Error::Msg("Missing tab 'SurroundSheetRows'"))??;
     let surround_sheet_rows: Vec<SurroundSheetRow> = RangeDeserializerBuilder::new()
-        .from_range::<_, SurroundSheetRow>(&capabilities_range)? // use header names and the bind object
+        .from_range::<_, SurroundSheetRow>(&range)? // use header names and the bind object
         .try_collect()?;
 
     // --- Read surrounds ---
-    let capabilities_range = workbook.worksheet_range("Surrounds")
+    let range = workbook.worksheet_range("Surrounds")
         .ok_or(Error::Msg("Missing tab 'Surrounds'"))??;
     let surrounds: Vec<SurroundRow> = RangeDeserializerBuilder::new()
-        .from_range::<_, SurroundRow>(&capabilities_range)? // use header names and the bind object
+        .from_range::<_, SurroundRow>(&range)? // use header names and the bind object
         .try_collect()?;
 
     // --- Return the object ---
     Ok(CapabilitiesDB{capabilities, surround_sheet_rows, surrounds})
+}
+
+
+impl Default for SurroundList {
+    /// Default to an empty list.
+    fn default() -> Self {
+        SurroundList{names: Default::default()}
+    }
 }
 
 

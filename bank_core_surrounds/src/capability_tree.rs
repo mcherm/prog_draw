@@ -102,6 +102,14 @@ impl From<CoreOrSurround> for &'static str {
 }
 
 
+impl Default for CoreOrSurround {
+    // Default to blank (mostly so it works with reading Serde from excel).
+    fn default() -> Self {
+        return CoreOrSurround::Blank
+    }
+}
+
+
 impl CapabilityData {
     fn new(
         id_str: String,
