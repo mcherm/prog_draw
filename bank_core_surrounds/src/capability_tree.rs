@@ -11,12 +11,11 @@ use prog_draw::geometry::{Coord, Rect};
 use prog_draw::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
 use prog_draw::text_size::get_system_text_sizer;
 use prog_draw::tidy_tree::{NULL_ID, TidyTree};
-use crate::used_by::{UsedBySet, get_color_strs, UsedBy};
+use crate::used_by::{UsedBySet, get_color_strs};
 use crate::document::{
     BASELINE_RISE, COLLAPSE_DOT_RADIUS, NODE_ITEM_ROUND_CORNER,
     TEXT_ITEM_PADDING, LAYER_SPACING, ITEM_SPACING
 };
-use crate::fold_up;
 use crate::capability_db::CapabilitiesDB;
 
 
@@ -573,150 +572,6 @@ fn set_node_loc_style_internal(dtnode: &mut DTNode<CapabilityData>) {
 }
 
 
-/// Returns the core tree and the surrounds tree, from an input file that's been included at
-/// compile time.
-pub fn read_csv_from_bokor_str(data: &str, fold_info: fold_up::FoldInfo) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
-    let mut reader = csv::ReaderBuilder::new().from_reader(data.as_bytes());
-    read_csv_from_bokor_reader(&mut reader, fold_info)
-}
-
-
-/// Returns the core tree and the surrounds tree from data in the input file specified.
-#[allow(dead_code)]
-pub fn read_csv_from_bokor_file(input_filename: &str, fold_info: fold_up::FoldInfo) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
-    let mut reader = csv::Reader::from_path(input_filename)?;
-    read_csv_from_bokor_reader(&mut reader, fold_info)
-}
-
-
-/// Returns the core tree and the surrounds tree
-///
-/// FIXME: This panics if the format isn't as expected. Should be made more robust.
-pub fn read_csv_from_bokor_reader<R: std::io::Read>(reader: &mut csv::Reader<R>, fold_info: fold_up::FoldInfo) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
-    const LEVEL_COLS: [usize; 5] = [0,1,2,3,4];
-    const FEATURE_PLACEMENT_COL: usize = 7;
-    const LOB_USAGE_COLS: [usize;3] = [9,10,11];
-    static EMPTY_STRING: String = String::new();
-
-    // --- Variables we will track from row to row ---
-    /// we'll track 3 fields for each tree we are building
-    struct FieldsTrackedPerTree {
-        commands: Vec<DTNodeBuild<CapabilityData>>,
-        id_source: usize,
-        prev_node_names: Vec<String>, // entry for each branch node
-        prev_item_text: String,
-    }
-    impl FieldsTrackedPerTree {
-        fn new() -> Self {
-            FieldsTrackedPerTree{commands: Vec::new(), id_source: 1, prev_node_names: Vec::new(), prev_item_text: String::new()}
-        }
-    }
-
-    // --- Create two of them for the two trees ---
-    let mut fields_core = FieldsTrackedPerTree::new();
-    let mut fields_surround = FieldsTrackedPerTree::new();
-
-    // --- Start reading the CSV ---
-    for result in reader.records() {
-        let record = result.unwrap();
-
-        // --- get the used_by_set for this leaf ---
-        let usage_strs = [0,1,2]
-            .map(|i| {
-                record.get(LOB_USAGE_COLS[i])
-                    .unwrap_or_else(|| panic!("Column {} missing for row {:?}", LOB_USAGE_COLS[0], record))
-                    .into()
-            });
-        let used_by_set = UsedBySet::from_fields(usage_strs[0], usage_strs[1], usage_strs[2]);
-
-        // --- find which tree this leaf is on ---
-        let feature_placement = record.get(FEATURE_PLACEMENT_COL).unwrap();
-        let places_to_display = match feature_placement {
-            "Core"     => vec![&mut fields_core],
-            "Surround" => vec![&mut fields_surround],
-            "Not Sure" => vec![&mut fields_core, &mut fields_surround],
-            ""         => vec![&mut fields_core, &mut fields_surround],
-            _ => panic!("Invalid feature placement of '{}' in row {:?}", feature_placement, record),
-        };
-
-        // --- Loop through the places we might display this (could be in core, surround, or both) ---
-        for fields in places_to_display {
-
-            // --- find the node_names ---
-            let mut this_node_names: Vec<String> = (0..LEVEL_COLS.len())
-                .map(|x| record.get(x).unwrap().to_string())
-                .take_while(|x| x.len() > 0)
-                .collect();
-            let item_text = this_node_names.pop().unwrap(); // the last one isn't a node name, it's the item
-
-            // --- close out nodes as needed ---
-            let mut depth;
-            if fields.prev_node_names.len() == 0 {
-                depth = 0;
-            } else {
-                depth = fields.prev_node_names.len() - 1;
-                loop {
-                    let prev_name = fields.prev_node_names.get(depth).unwrap();
-                    let this_name = this_node_names.get(depth).unwrap_or(&EMPTY_STRING);
-                    if prev_name == this_name {
-                        depth += 1;
-                        break; // we can exit the loop; we found an identical ancestor node
-                    } else {
-                        fields.commands.push(EndChildren); // they're different, close out that depth
-                    }
-                    if depth == 0 {
-                        break;
-                    } else {
-                        depth -= 1;
-                    }
-                }
-            }
-
-            // --- double-check that previous nodes are the same ---
-            for deeper_depth in 0..depth {
-                let prev_name = fields.prev_node_names.get(deeper_depth).unwrap();
-                let this_name = this_node_names.get(deeper_depth).unwrap_or(&EMPTY_STRING);
-                assert_eq!(prev_name, this_name);
-            }
-
-            // --- create new nodes as needed ---
-            while depth < this_node_names.len() {
-                let this_name = this_node_names.get(depth).unwrap();
-                let collapsed = fold_info.is_fold_path(&this_node_names, depth + 1);
-                fields.commands.push(AddData(CapabilityData::new_generating_id(this_name, UsedBySet::all_mixed(), &mut fields.id_source, collapsed)));
-                fields.commands.push(StartChildren(collapsed));
-                depth += 1;
-            }
-
-            // --- add THIS node ---
-            let collapsed = false;
-            fields.commands.push(AddData(CapabilityData::new_generating_id(&item_text, used_by_set, &mut fields.id_source, collapsed)));
-
-            // --- update prev_node_names ---
-            fields.prev_node_names = this_node_names;
-            fields.prev_item_text = item_text;
-        }
-    }
-
-    // --- Create a tree from the commands ---
-    let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::JavaScriptReplace);
-    core_tree.grow_tree(fields_core.commands).expect("The data insertion is unbalanced for core.");
-    let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::JavaScriptReplace);
-    surround_tree.grow_tree(fields_surround.commands).expect("The data insertion is unbalanced for surround.");
-
-    // --- Return the result ---
-    Ok([core_tree, surround_tree])
-}
-
-
-
-/// Returns the core tree and the surrounds tree, from an input file that's been included at
-/// compile time.
-pub fn read_csv_from_db_str(data: &str) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
-    let mut reader = csv::ReaderBuilder::new().from_reader(data.as_bytes());
-    read_csv_from_db_reader(&mut reader)
-}
-
 
 /// Returns the core tree and the surrounds tree
 ///
@@ -761,56 +616,3 @@ pub fn read_trees_from_capdb(capdb: &CapabilitiesDB) -> [CapabilityNodeTree; 2] 
     [core_tree, surround_tree]
 }
 
-
-/// Returns the core tree and the surrounds tree
-///
-/// FIXME: This panics if the format isn't as expected. Should be made more robust.
-pub fn read_csv_from_db_reader<R: std::io::Read>(reader: &mut csv::Reader<R>) -> Result<[CapabilityNodeTree; 2], std::io::Error> {
-    // --- Create two of them for the two trees ---
-    let mut core_tree = CapabilityNodeTree::new(TreeLayoutDirection::Left, TreeCollapsePolicy::JavaScriptReplace);
-    let mut surround_tree = CapabilityNodeTree::new(TreeLayoutDirection::Right, TreeCollapsePolicy::JavaScriptReplace);
-
-    // --- Start reading the CSV ---
-    for result in reader.records() {
-        let record = result.unwrap();
-
-        let id = record.get(0).unwrap();
-        let parent_id = record.get(1).unwrap();
-        let name = record.get(2).unwrap();
-        let _level = record.get(3).unwrap().parse::<usize>().unwrap();
-        let _ = record.get(4).unwrap();
-        let description = record.get(5).unwrap();
-        let core_surround: CoreOrSurround = record.get(6).unwrap().into();
-        let notes = record.get(7).unwrap();
-        let used_by_consumer: UsedBy = record.get(8).unwrap().into();
-        let used_by_sbb: UsedBy = record.get(9).unwrap().into();
-        let used_by_commercial: UsedBy = record.get(10).unwrap().into();
-
-        // --- Skip root ---
-        if id == "ROOT" {
-            continue;
-        }
-
-        // --- Create capability ---
-        let used_by_set = UsedBySet::from_fields(used_by_consumer, used_by_sbb, used_by_commercial);
-        let collapsed = false;
-        let capability_data = CapabilityData::new_new(id, parent_id, name, used_by_set, description, core_surround, notes, collapsed);
-
-        // --- Add to one or both trees ---
-        match capability_data.core_surround {
-            CoreOrSurround::Core => {
-                core_tree.add_node(capability_data);
-            }
-            CoreOrSurround::Surround => {
-                surround_tree.add_node(capability_data);
-            }
-            CoreOrSurround::Blank | CoreOrSurround::NotSure | CoreOrSurround::Mixed => {
-                core_tree.add_node(capability_data.clone());
-                surround_tree.add_node(capability_data);
-            }
-        }
-    }
-
-    // --- Return the result ---
-    Ok([core_tree, surround_tree])
-}

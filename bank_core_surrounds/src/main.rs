@@ -1,5 +1,4 @@
 mod trifoil;
-mod fold_up;
 mod used_by;
 mod capability_tree;
 mod capability_db;

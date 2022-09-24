@@ -3,6 +3,10 @@ name = "bank_core_surrounds"
 version = "0.1.2"
 authors = ["Michael Chermside <mcherm@mcherm.com>"]
 edition = "2021"
+description = "Code used to generate a rather fancy dynamic HTML diagram from input date."
+repository = "https://github.com/mcherm/prog_draw"
+license ="Apache-2.0"
+
 
 [lib]
 crate-type = ["cdylib"]
