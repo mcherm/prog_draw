@@ -5,8 +5,9 @@
 use serde::Deserialize;
 use calamine::{Error, Xlsx, Reader, RangeDeserializerBuilder};
 use itertools::Itertools;
+use std::collections::HashSet;
 use crate::capability_tree::CoreOrSurround;
-use crate::used_by::UsedBy;
+use crate::used_by::{UsedBy, UsedBySet};
 
 
 #[derive(Deserialize, Debug)]
@@ -37,6 +38,28 @@ pub struct CapabilitiesRow {
 
 #[derive(Deserialize, Debug)]
 pub struct SurroundSheetRow {
+    #[serde(rename(deserialize = "Id"))]
+    pub id: String,
+    #[serde(default, rename(deserialize = "Functionality"))]
+    pub functionality: String,
+    #[serde(default, rename(deserialize = "Description"))]
+    pub description: String,
+    #[serde(default, rename(deserialize = "Notes"))]
+    pub notes: String,
+    #[serde(rename(deserialize = "CoreOrSurround"), deserialize_with = "deserialize_surround_list")]
+    pub core_surround: SurroundList,
+    #[serde(rename(deserialize = "ConsumerCurrent"), deserialize_with = "deserialize_surround_list")]
+    pub consumer_current: SurroundList,
+    #[serde(rename(deserialize = "SBBCurrent"), deserialize_with = "deserialize_surround_list")]
+    pub sbb_current: SurroundList,
+    #[serde(rename(deserialize = "CommercialCurrent"), deserialize_with = "deserialize_surround_list")]
+    pub commercial_current: SurroundList,
+    #[serde(rename(deserialize = "ConsumerDestination"), deserialize_with = "deserialize_surround_list")]
+    pub consumer_destination: SurroundList,
+    #[serde(rename(deserialize = "SBBDestination"), deserialize_with = "deserialize_surround_list")]
+    pub sbb_destination: SurroundList,
+    #[serde(rename(deserialize = "CommercialDestination"), deserialize_with = "deserialize_surround_list")]
+    pub commercial_destination: SurroundList,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -67,7 +90,14 @@ pub struct SurroundRow {
     pub commercial_destination: bool,
 }
 
+#[derive(Debug)]
+pub struct SurroundList {
+    names: Vec<String>
+}
+
+
 /// An object that contains all the data from the Capabilities DB file.
+#[derive(Debug)]
 pub struct CapabilitiesDB {
     pub capabilities: Vec<CapabilitiesRow>,
     pub surround_sheet_rows: Vec<SurroundSheetRow>,
@@ -123,6 +153,30 @@ fn deserialize_yes_no<'de, D>(deserializer: D) -> Result<bool,D::Error>
     }
 }
 
+fn deserialize_surround_list<'de, D>(deserializer: D) -> Result<SurroundList,D::Error>
+    where D: serde::Deserializer<'de>
+{
+    let data_type = calamine::DataType::deserialize(deserializer);
+    match data_type {
+        Ok(calamine::DataType::String(s)) => {
+            let names: Vec<String> = s.split("\n")
+                .map(|x| match x.strip_prefix("New Surround - ") {
+                    None => x,
+                    Some(s) => s,
+                })
+                .map(|s| s.to_string())
+                .collect();
+            Ok(SurroundList{names})
+        },
+        Ok(calamine::DataType::Empty) => {
+            Ok(SurroundList{names: Vec::new()})
+        }
+        Ok(_) => panic!("Non-string field in UsedBy."), // FIXME: should return err, but I don't know how
+        Err(e) => Err(e),
+    }
+}
+
+
 
 pub fn read_db(bytes: &[u8]) -> Result<CapabilitiesDB, Error> {
     // --- Open file ---
@@ -151,4 +205,66 @@ pub fn read_db(bytes: &[u8]) -> Result<CapabilitiesDB, Error> {
 
     // --- Return the object ---
     Ok(CapabilitiesDB{capabilities, surround_sheet_rows, surrounds})
+}
+
+
+impl CapabilitiesDB {
+
+    /// This finds the surrounds that are expected to implement a given capability. It is passed
+    /// the ID for a capability; it uses the data to find surrounds that are expected to implement
+    /// it, and it returns a vector of pairs, giving the name of the surround and a UsedBySet
+    /// containing only YES and NO values (at least one of which should be YES) to indicate
+    /// WHICH divisions are using that surround.
+    pub fn get_related_surrounds<'a>(&'a self, cap_id: &str) -> Vec<(&'a str, UsedBySet)> {
+        // --- First, find the SSR (if any) ---
+        let mut cap = self.capabilities.iter().filter(|x| x.id == cap_id).nth(0).expect("Capability ID was invalid.");
+        let mut ssrid_opt: Option<&str> = match &cap.ssr_id {None => None, Some(x) => Some(&x)};
+        loop {
+            match ssrid_opt {
+                Some("*") => {
+                    let parent = self.capabilities.iter().filter(|x| x.id == cap.parent_id).nth(0).expect("Parent capability invalid.");
+                    assert!(parent.level == cap.level - 1);
+                    cap = parent;
+                    ssrid_opt = match &cap.ssr_id {None=> None, Some(x) => Some(&x)};
+                    continue;
+                },
+                None | Some("") => {
+                    ssrid_opt = None;
+                    break;
+                },
+                Some(_) => break,
+            }
+        }
+
+        // --- Handle case where there's no SSR_ID ---
+        let ssr_id = match ssrid_opt {
+            None => return Vec::default(), // no SSR_ID means no surrounds use this; we're done
+            Some(ssr_id) => ssr_id,
+        };
+
+        // --- Find the destination systems for that SSR_ID ---
+        let mut answer: Vec<(&'a str, UsedBySet)> = Vec::new();
+        let ssr_row = self.surround_sheet_rows.iter().filter(|x| x.id == ssr_id).nth(0).expect("SSRID is invalid.");
+        let mut unique_names: HashSet<&str> = HashSet::new();
+        unique_names.extend(ssr_row.consumer_destination.names.iter().map(|x| x.as_str()));
+        unique_names.extend(ssr_row.sbb_destination.names.iter().map(|x| x.as_str()));
+        unique_names.extend(ssr_row.commercial_destination.names.iter().map(|x| x.as_str()));
+        for surround_name in unique_names {
+            fn ub(sl: &SurroundList, name: &str) -> UsedBy {
+                if sl.names.iter().any(|x| x.as_str() == name) {
+                    UsedBy::Yes
+                } else {
+                    UsedBy::No
+                }
+            }
+            let used_by = UsedBySet::from_fields(
+                ub(&ssr_row.consumer_destination, surround_name),
+                ub(&ssr_row.sbb_destination, surround_name),
+                ub(&ssr_row.commercial_destination, surround_name),
+            );
+            answer.push((surround_name, used_by))
+        }
+        answer
+    }
+
 }

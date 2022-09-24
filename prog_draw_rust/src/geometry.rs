@@ -38,7 +38,9 @@ impl Rect {
     pub fn bottom(&self) -> Coord {self.top + self.height}
     pub fn width(&self) -> Coord {self.width}
     pub fn height(&self) -> Coord {self.height}
-    pub fn center(&self) -> Point {(self.left + self.width / 2.0, self.top + self.height / 2.0)}
+    pub fn center_x(&self) -> Coord {self.left + self.width / 2.0}
+    pub fn center_y(&self) -> Coord {self.top + self.height / 2.0}
+    pub fn center(&self) -> Point {(self.center_x(), self.center_y())}
 
     /// Returns the smallest Rect that covers both self and other.
     pub fn cover(&self, other: &Rect) -> Rect {

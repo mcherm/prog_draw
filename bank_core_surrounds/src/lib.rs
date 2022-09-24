@@ -8,13 +8,13 @@ mod center_dot;
 mod document;
 mod capability_html;
 mod surrounds;
+mod connecting_lines;
 
 
 
 use std::sync::{Mutex, Once};
 use std::borrow::BorrowMut;
 use document::TwoTreeViewDocument;
-use capability_tree::read_csv_from_bokor_str;
 use prog_draw::text_size;
 use wasm_bindgen::prelude::*;
 
@@ -87,7 +87,7 @@ pub fn get_initial_document() -> TwoTreeViewDocument {
     };
 
     // --- Create the document ---
-    TwoTreeViewDocument::new(&capdb)
+    TwoTreeViewDocument::new(capdb)
 }
 
 

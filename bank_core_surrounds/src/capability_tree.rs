@@ -54,7 +54,7 @@ pub struct CapabilityData {
 
 #[derive(Debug)]
 pub struct CapabilityNodeTree {
-    tree: DTNode<CapabilityData>,
+    pub tree: DTNode<CapabilityData>,
     layout_direction: TreeLayoutDirection,
     tree_collapse_policy: TreeCollapsePolicy,
 }

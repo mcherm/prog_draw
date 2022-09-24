@@ -60,15 +60,28 @@ impl SurroundItems {
     pub fn new(capdb: &CapabilitiesDB) -> Self {
         let items = capdb.surrounds.iter()
             .filter(|x| x.is_destination)
+            .filter(|x| x.name.as_str() != "Destination Core") // suppress this one in particular
             .map(|x| SurroundItem::new(x))
             .collect();
         SurroundItems{items}
+    }
+
+    /// Given the name of a surround, this returns the SurroundItem (or None if it
+    /// isn't found).
+    pub fn get_by_name(&self, name: &str) -> Option<&SurroundItem> {
+        for item in self.items.iter() {
+            if item.data.name.as_str() == name {
+                return Some(item)
+            }
+        }
+        return None
     }
 
 
     /// Lays out the surround items. Is passed the (already laid out) surround_tree that
     /// it is being placed next to.
     pub fn layout(&mut self, surround_tree: &CapabilityNodeTree) {
+        // --- layout height ---
         let item_height: Coord = self.items.iter()
             .map(|x| x.get_bbox().height())
             .sum();

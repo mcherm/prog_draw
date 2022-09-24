@@ -8,6 +8,9 @@ use crate::geometry::{Coord, Rect};
 pub trait SvgPositioned: Renderable {
     /// Returns a bounding box for this item. The bounding box is relative to the local
     /// coordinate system.
+    /// FIXME: I keep encountering things that sometimes take up NO space. Maybe
+    ///   I need to make this return Option<Rect> to handle that case. If so, then
+    ///   I also need to make reduce() with Rect::cover() continue to work somehow.
     fn get_bbox(&self) -> Rect;
 }
 

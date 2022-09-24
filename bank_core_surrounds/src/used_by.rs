@@ -54,7 +54,7 @@ impl UsedBySet {
 
     /// Returns a UsedBy where everything is "Blank".
     pub fn all_blank() -> Self {
-        UsedBySet{consumer: UsedBy::Mixed, sbb: UsedBy::Mixed, commercial: UsedBy::Mixed}
+        UsedBySet{consumer: UsedBy::Blank, sbb: UsedBy::Blank, commercial: UsedBy::Blank}
     }
 
     /// Given 3 strings from the file (in order consumer, sbb, commercial) this returns the
@@ -64,6 +64,7 @@ impl UsedBySet {
     }
 }
 
+/// Returns the colors to use for (box, text) to represent this UsedBySet.
 pub fn get_color_strs(used_by_set: &UsedBySet) ->  (&'static str, &'static str) {
     let used_bys = [used_by_set.consumer, used_by_set.sbb, used_by_set.commercial];
     let has_mixed = used_bys.iter().any(|x| *x == UsedBy::Mixed);
