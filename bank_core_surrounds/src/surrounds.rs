@@ -7,9 +7,8 @@ use prog_draw::geometry::{Point, Coord, Rect};
 use prog_draw::text_size::get_system_text_sizer;
 use prog_draw::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
 use crate::capability_db::{CapabilitiesDB, SurroundRow};
-use crate::capability_tree::CapabilityNodeTree;
 use crate::used_by::{get_color_strs, UsedBy, UsedBySet};
-use crate::document::{BASELINE_RISE, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING, ITEM_SPACING, SPACING_TO_SURROUNDS};
+use crate::document::{BASELINE_RISE, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
 
 
 #[derive(Debug)]
@@ -53,6 +52,17 @@ impl SurroundItem {
         );
         Self{data, location, text_size, used_by_set}
     }
+
+    /// Returns the (should be unique) ID for this surround.
+    pub fn id(&self) -> &str {
+        self.data.id.as_str()
+    }
+
+    /// Provide a new preferred y location for this node. The position is requested, but
+    /// there might be crowding.
+    pub fn reposition(&mut self, y_loc: Coord) {
+        self.location.1 = y_loc;
+    }
 }
 
 
@@ -77,23 +87,20 @@ impl SurroundItems {
         return None
     }
 
+    pub fn get_by_id_mut(&mut self, id: &str) -> Option<&mut SurroundItem> {
+        for item in self.items.iter_mut() {
+            if item.data.id.as_str() == id {
+                return Some(item)
+            }
+        }
+        return None
+    }
 
-    /// Lays out the surround items. Is passed the (already laid out) surround_tree that
-    /// it is being placed next to.
-    pub fn layout(&mut self, surround_tree: &CapabilityNodeTree) {
-        // --- layout height ---
-        let item_height: Coord = self.items.iter()
-            .map(|x| x.get_bbox().height())
-            .sum();
-        let spacing_height = ((self.items.len() - 1) as Coord) * ITEM_SPACING;
-        let total_height = item_height + spacing_height;
-        let half_height_of_top_item = self.items.first().unwrap().get_bbox().height() / 2.0;
-        let starting_y = 0.5 * total_height - half_height_of_top_item;
-        let x = surround_tree.get_bbox().right() + SPACING_TO_SURROUNDS;
-        let mut y = 0.0 - starting_y;
-        for mut item in self.items.iter_mut() {
-            item.location = (x,y);
-            y += item.get_bbox().height() + ITEM_SPACING;
+
+    /// sets all the nodes to a new X position.
+    pub fn set_x_position(&mut self, x_pos: Coord) {
+        for item in self.items.iter_mut() {
+            item.location.0 = x_pos;
         }
     }
 }

@@ -3,14 +3,13 @@
 // implement it. This module creates one.
 //
 
-use std::collections::VecDeque;
-use prog_draw::data_tree::{DTNode, LAYOUT_DIRECTION, TreeLayoutDirection};
+use prog_draw::data_tree::DTNode;
 use prog_draw::geometry::{Coord, Point, Rect};
 use prog_draw::svg_render::SvgPositioned;
 use prog_draw::svg_writer::{Renderable, TagWriter, TagWriterError, Attributes};
 use crate::capability_tree::CapabilityData;
-use crate::used_by::get_color_strs;
-use crate::document::{TwoTreeViewDocument, CONNECT_DOT_RADIUS};
+use crate::used_by::{get_color_strs, UsedBySet};
+use crate::document::CONNECT_DOT_RADIUS;
 
 
 const LINE_CTRL_OFFSET: Coord = 10.0;
@@ -38,50 +37,20 @@ impl Default for ConnectingLines {
 
 
 impl ConnectingLines {
-    /// Create a ConnectingLines. It is passed a document in which the surround_tree and
-    /// the surrounds have already been laid out.
-    pub fn new(doc: &TwoTreeViewDocument) -> Self {
-        // we will fill this in
-        let mut lines: Vec<Line> = Vec::new();
+    /// Call this to clear out the existing lines (before adding new ones).
+    pub fn clear(&mut self) {
+        self.lines.clear();
+    }
 
-        // Before we try to get bounding boxes, need to set the tree direction
-        LAYOUT_DIRECTION.with(|it| it.set(Some(TreeLayoutDirection::Right)));
-
-        // we'll use iteration instead of recursion, so here's our stack
-        let mut node_stack: VecDeque<&DTNode<CapabilityData>> = VecDeque::new();
-        node_stack.push_back(&doc.surround_tree.tree);
-        while !node_stack.is_empty() {
-            let node = node_stack.pop_front().unwrap();
-            if node.children.is_empty() || node.collapsed {
-                // --- it's "leaf" (as visible on the screen now) ---
-                for (surround_name, used_by_set) in doc.capdb.get_related_surrounds(&node.data.id) {
-                    let cap_bbox = node.get_bbox();
-                    let start: Point = (cap_bbox.right(), cap_bbox.center_y());
-                    let surround_opt = doc.surrounds.get_by_name(surround_name);
-                    if surround_opt.is_none() {
-                        println!("Could not find a surround named '{}' which is mentioned in {}. Skipped.", surround_name, node.data.id);
-                        continue;
-                    }
-                    let surround = surround_opt.expect("Surround not found.");
-                    let sur_bbox = surround.get_bbox();
-                    let end: Point = (sur_bbox.left(), sur_bbox.center_y());
-                    let color = get_color_strs(&used_by_set).0;
-                    let line: Line = Line{start, end, color};
-                    lines.push(line)
-                }
-            } else{
-                // --- not a "leaf" so "recurse" ---
-                for child in node.children.iter() {
-                    node_stack.push_back(child)
-                }
-            }
-        }
-
-        // Now that we're done, restore the tree direction
-        LAYOUT_DIRECTION.with(|it| it.set(None));
-
-        // --- return the answer ---
-        Self{lines}
+    /// Call this to add in a new line. It's promised that we're in a mode where we can safely
+    /// get bbox data for the DTNode.
+    pub fn add_line(&mut self, cap_node: &DTNode<CapabilityData>, surround_pos: Point, used_by_set: &UsedBySet) {
+        let cap_bbox = cap_node.get_bbox();
+        let start: Point = (cap_bbox.right(), cap_bbox.center_y());
+        let end = surround_pos;
+        let color = get_color_strs(&used_by_set).0;
+        let line: Line = Line{start, end, color};
+        self.lines.push(line);
     }
 }
 

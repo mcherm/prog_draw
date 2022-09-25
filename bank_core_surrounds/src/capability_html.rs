@@ -7,6 +7,7 @@ use html_escape::encode_text;
 
 
 /// Render the CapabilityData as an HTML div suitable for a pop-up.
+#[allow(dead_code)] // this IS used, but from javascript
 pub fn as_html(data: &CapabilityData) -> String {
     let name = encode_text(&data.text);
     let description = encode_text(&data.description);
@@ -49,6 +50,7 @@ pub fn as_html(data: &CapabilityData) -> String {
 }
 
 /// Return the style tag needed to properly display capability data.
+#[allow(dead_code)] // this IS used, but from javascript
 pub fn style() -> &'static str {
     r##"
         .modal-shade {

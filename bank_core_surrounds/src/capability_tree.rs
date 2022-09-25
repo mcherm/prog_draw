@@ -378,10 +378,11 @@ impl CapabilityNodeTree {
         let mut nums = NumberMapper::new();
         nums.set("", NULL_ID);
         let mut tidy = TidyTree::with_tidy_layout(LAYER_SPACING, ITEM_SPACING);
+        let existing_direction = LAYOUT_DIRECTION.with(|it| it.get());
         LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
         add_to_tidy(&mut nums, &mut tidy, &self.tree, "");
         tidy.layout();
-        LAYOUT_DIRECTION.with(|it| it.set(None));
+        LAYOUT_DIRECTION.with(|it| it.set(existing_direction));
         let locations: HashMap<usize, (f64, f64)> = tidy.get_pos().iter()
             .tuples::<(_,_,_)>() // break into groups of 3
             .map(|(id,x,y)| (*id as usize, match self.layout_direction {
@@ -403,6 +404,7 @@ impl CapabilityNodeTree {
     ///
     /// FIXME: if DTNode someday grows a method for iterating over the tree I could use
     ///   that. Until then, it's done directly in this method.
+    #[allow(dead_code)] // this IS used, but from javascript
     pub fn toggle_collapse(&mut self, node_id: &str) -> bool {
         /// Output of Internal recursive subroutine.
         enum Outcome {NotFound, FoundAndChanged, FoundNoChange}
@@ -446,11 +448,12 @@ impl Renderable for CapabilityNodeTree {
           }
         "#;
         tag_writer.tag_with_text("style", Attributes::new(), style_text)?;
+        let existing_direction = LAYOUT_DIRECTION.with(|it| it.get());
         LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
         TREE_COLLAPSE_POLICY.with(|it| it.set(self.tree_collapse_policy));
         self.tree.render(tag_writer)?;
         TREE_COLLAPSE_POLICY.with(|it| it.set(Default::default()));
-        LAYOUT_DIRECTION.with(|it| it.set(None));
+        LAYOUT_DIRECTION.with(|it| it.set(existing_direction));
         tag_writer.end_tag("g")?;
         Ok(())
     }
@@ -458,9 +461,10 @@ impl Renderable for CapabilityNodeTree {
 
 impl SvgPositioned for CapabilityNodeTree {
     fn get_bbox(&self) -> Rect {
+        let existing_direction = LAYOUT_DIRECTION.with(|it| it.get());
         LAYOUT_DIRECTION.with(|it| it.set(Some(self.layout_direction)));
         let answer = self.tree.get_bbox();
-        LAYOUT_DIRECTION.with(|it| it.set(None));
+        LAYOUT_DIRECTION.with(|it| it.set(existing_direction));
         answer
     }
 }

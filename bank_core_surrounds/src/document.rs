@@ -2,7 +2,8 @@
 // Support for document objects.
 //
 
-use prog_draw::data_tree::DTNode;
+use std::collections::{HashMap, VecDeque};
+use prog_draw::data_tree::{DTNode, LAYOUT_DIRECTION, TreeLayoutDirection};
 use prog_draw::geometry::Coord;
 use prog_draw::svg_writer::Renderable;
 use prog_draw::svg_writer::{TagWriterImpl, TagWriter, TagWriterError};
@@ -14,6 +15,7 @@ use crate::capability_tree::{CapabilityData, CapabilityNodeTree, read_trees_from
 use crate::center_dot::CenterDot;
 use crate::surrounds::SurroundItems;
 use crate::connecting_lines::ConnectingLines;
+use crate::used_by::UsedBySet;
 
 
 pub const TEXT_ITEM_PADDING: Coord = 2.0;
@@ -87,6 +89,7 @@ impl TwoTreeViewDocument {
     }
 
     /// Returns the CapabilityData with that node_id if it exists; None if not.
+    #[allow(dead_code)] // this IS used, but from javascript
     pub fn get_node_data(&self, id: &str) -> Option<&CapabilityData> {
         // NOTE: The tricky bit is that it could be in either tree (and we don't care which it's in)
         match self.core_tree.find_data_by_id(id) {
@@ -122,6 +125,7 @@ impl TwoTreeViewDocument {
     }
 
     /// Toggles the collapsed state of a node. Leaf and Root nodes are unaffected.
+    #[allow(dead_code)] // this IS used, but from javascript
     pub fn toggle_collapse(&mut self, node_id: &str) {
         let should_layout_core_tree = self.core_tree.toggle_collapse(node_id);
         let should_layout_surround_tree = self.surround_tree.toggle_collapse(node_id);
@@ -134,6 +138,7 @@ impl TwoTreeViewDocument {
     ///
     /// NOTE: It uses a string instead of an enum because it was designed to interact
     ///   with JavaScript.
+    #[allow(dead_code)] // this IS used, but from javascript
     pub fn refold(&mut self, named_fold: &str) {
         match named_fold {
             "LEVEL_2" => {
@@ -174,8 +179,7 @@ impl TwoTreeViewDocument {
         }
         if should_layout_surround_tree {
             self.surround_tree.layout();
-            self.surrounds.layout(&self.surround_tree);
-            self.connecting_lines = ConnectingLines::new(self);
+            self.regenerate_connecting_lines();
         }
     }
 
@@ -193,5 +197,96 @@ impl TwoTreeViewDocument {
             trifoil_bbox.left() - TRIFOIL_MARGIN
         };
         (x_position, y_position)
+    }
+
+
+    /// This both re-creates the connecting lines and repositions the items in the SurroundItems.
+    /// It must be called AFTER the surround tree has been laid out correctly.
+    fn regenerate_connecting_lines(&mut self) {
+        // Before we try to get bounding boxes, need to set the tree direction
+        let existing_direction = LAYOUT_DIRECTION.with(|it| it.get());
+        LAYOUT_DIRECTION.with(|it| it.set(Some(TreeLayoutDirection::Right)));
+
+        // This is the list of (requirement, surround) pairs. We'll use it for layout,
+        // then for making lines.
+        // FIXME: Can probably just store the LOCATION of the DTNode. Which would be better
+        struct Connection<'a>(&'a DTNode<CapabilityData>, &'a str, UsedBySet);
+
+        let mut connections: Vec<Connection> = Vec::new();
+
+        // we'll use iteration instead of recursion, so here's our stack
+        let mut node_stack: VecDeque<&DTNode<CapabilityData>> = VecDeque::new();
+        node_stack.push_back(&self.surround_tree.tree);
+        while !node_stack.is_empty() {
+            let node = node_stack.pop_front().unwrap();
+            if node.children.is_empty() || node.collapsed {
+                // --- it's "leaf" (as visible on the screen now) ---
+                for (surround_name, used_by_set) in self.capdb.get_related_surrounds(&node.data.id) {
+                    match self.surrounds.get_by_name(surround_name) {
+                        None => {
+                            // FIXME: A better way to report this might be nice; this mostly just ignores bad data
+                            println!("Could not find a surround named '{}' which is mentioned in {}. Skipped.", surround_name, node.data.id);
+                        },
+                        Some(surround_item) => {
+                            connections.push(Connection(node, surround_item.id(), used_by_set));
+                        }
+                    }
+                }
+            } else{
+                // --- not a "leaf" so "recurse" ---
+                for child in node.children.iter() {
+                    node_stack.push_back(child)
+                }
+            }
+        }
+
+        // Now that we have connections, we can find the list of connections for each unique surround
+        let mut connections_by_surround_name: HashMap<&str, Vec<&Connection>> = HashMap::new();
+        for connection in connections.iter() {
+            let id = connection.1;
+            match connections_by_surround_name.get_mut(id) {
+                None => { // new surround
+                    connections_by_surround_name.insert(id, vec![connection]);
+                }
+                Some(connection_list) => { // existing surround
+                    connection_list.push(connection);
+                }
+            }
+        }
+
+        // Decide where to position the surrounds in the x direction
+        let surround_x = self.surround_tree.get_bbox().right() + SPACING_TO_SURROUNDS;
+
+        // Now we can position each surround vertically
+        let mut desired_surround_positions: HashMap<String, Coord> = HashMap::new();
+        for (id, connection_list) in connections_by_surround_name.iter() {
+            assert!(connection_list.len() > 0);
+
+            // Average the things it's connected to to find a y value
+            let sum_of_y_values: Coord = connection_list.iter()
+                .map(|connection| {
+                    // FIXME: Getting the bbox to find the position is wasteful; we used that to build the bbox!
+                    connection.0.data.get_bbox().center_y()
+                })
+                .sum();
+            let average_y = sum_of_y_values / (connection_list.len() as Coord);
+            desired_surround_positions.insert(id.to_string(), average_y);
+        }
+
+        // Now create the actual lines
+        self.connecting_lines.clear();
+        for connection in connections.iter() {
+            let surround_y = *desired_surround_positions.get(connection.1).unwrap();
+            self.connecting_lines.add_line(connection.0, (surround_x, surround_y), &connection.2);
+        }
+
+        // Now move the actual surrounds
+        self.surrounds.set_x_position(surround_x);
+        for (id, pos) in desired_surround_positions.iter() {
+            self.surrounds.get_by_id_mut(id.as_str()).unwrap().reposition(*pos);
+        }
+
+        // Now that we're done, restore the tree direction
+        LAYOUT_DIRECTION.with(|it| it.set(existing_direction));
     }
 }
