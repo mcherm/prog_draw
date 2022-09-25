@@ -187,7 +187,7 @@ impl TwoTreeViewDocument {
         let right_top = self.surround_tree.get_bbox().top();
         let best_top = left_top.max(right_top);
         let y_position = best_top + -trifoil_bbox.bottom() - TRIFOIL_MARGIN;
-        let x_position = if left_top >= right_top {
+        let x_position = if left_top <= right_top {
             -trifoil_bbox.left() + TRIFOIL_MARGIN
         } else {
             trifoil_bbox.left() - TRIFOIL_MARGIN
