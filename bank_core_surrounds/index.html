@@ -6,6 +6,10 @@
     </head>
     <body>
         <div id="svg_container"></div>
+        <div id="controls">
+            <button onclick="refold('LEVEL_2')">Level 2</button>
+            <button onclick="refold('ALL_OPEN')">Open All</button>
+        </div>
         <div id="modal_parent"></div>
         <script type="module">
             window.log = function(s) {
@@ -29,10 +33,13 @@
             // For both of those, "12.4px Arial" is an example of a font value.
 
 
-            import init, {initialize, get_style, get_svg, toggle_node, show_node} from "./pkg/bank_core_surrounds.js";
+            import init, {initialize, get_style, get_svg, toggle_node, refold, show_node} from "./pkg/bank_core_surrounds.js";
             window.toggle_then_draw = function(id) {
                 document.getElementById("svg_container").innerHTML = toggle_node(id);
             };
+            window.refold = function(named_fold) {
+                document.getElementById("svg_container").innerHTML = refold(named_fold);
+            }
             window.show_node_data = function(id) {
                 document.getElementById("modal_parent").innerHTML = show_node(id);
             }

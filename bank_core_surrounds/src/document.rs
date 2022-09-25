@@ -2,6 +2,7 @@
 // Support for document objects.
 //
 
+use prog_draw::data_tree::DTNode;
 use prog_draw::geometry::Coord;
 use prog_draw::svg_writer::Renderable;
 use prog_draw::svg_writer::{TagWriterImpl, TagWriter, TagWriterError};
@@ -126,6 +127,44 @@ impl TwoTreeViewDocument {
         let should_layout_surround_tree = self.surround_tree.toggle_collapse(node_id);
         self.update_layout(should_layout_core_tree, should_layout_surround_tree);
     }
+
+
+    /// Toggles the collapsed state of the whole document to a named well-known state. If
+    /// a name is passed in that isn't known, this will panic.
+    ///
+    /// NOTE: It uses a string instead of an enum because it was designed to interact
+    ///   with JavaScript.
+    pub fn refold(&mut self, named_fold: &str) {
+        match named_fold {
+            "LEVEL_2" => {
+                fn apply_to_tree(node: &mut DTNode<CapabilityData>, depth: usize) {
+                    if depth < 2 {
+                        node.collapsed = false;
+                        for child in node.children.iter_mut() {
+                            apply_to_tree(child, depth + 1);
+                        }
+                    } else if depth == 2 {
+                        node.collapsed = true;
+                    }
+                }
+                apply_to_tree(&mut self.core_tree.tree, 0);
+                apply_to_tree(&mut self.surround_tree.tree, 0);
+            },
+            "ALL_OPEN" => {
+                fn apply_to_tree(node: &mut DTNode<CapabilityData>) {
+                    node.collapsed = false;
+                    for child in node.children.iter_mut() {
+                        apply_to_tree(child);
+                    }
+                }
+                apply_to_tree(&mut self.core_tree.tree);
+                apply_to_tree(&mut self.surround_tree.tree);
+            },
+            _ => panic!("The name '{}' is not a known refold state.", named_fold)
+        }
+        self.update_layout(true, true);
+    }
+
 
     fn update_layout(&mut self, should_layout_core_tree: bool, should_layout_surround_tree: bool) {
         // FIXME: It would be better if the document maintained a needs_layout flag and

@@ -65,7 +65,7 @@ pub fn get_style() -> String {
 #[wasm_bindgen]
 pub fn get_svg() -> String {
     match GLOBAL_DOCUMENT.lock().unwrap().get_svg_str() {
-        Ok(s) => s.into(),
+        Ok(s) => s,
         Err(_) => "<h1>Error</h1>".into(),
     }
 }
@@ -82,6 +82,14 @@ pub fn show_node(node_id: String) -> String {
         GLOBAL_DOCUMENT.lock().unwrap().get_node_data(&node_id).unwrap()
     )
 }
+
+/// This adjusts the collapse settings to one of the known, named states.
+#[wasm_bindgen]
+pub fn refold(named_fold: String) -> String {
+    GLOBAL_DOCUMENT.lock().unwrap().refold(&named_fold);
+    get_svg()
+}
+
 
 pub fn get_initial_document() -> TwoTreeViewDocument {
     // --- read the data ---
