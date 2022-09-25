@@ -139,15 +139,11 @@ impl SurroundItems {
     /// given desired y positions using the reposition() call. It goes through the entire
     /// collection and determines actual positions such that the items won't overlap.
     pub fn distribute_space(&mut self) {
-        println!("Calling distribute_space()"); // FIXME: Remove
+        // --- call the layout function ---
         let mut has_desired: Vec<&mut SurroundItem> = self.items.iter_mut()
             .filter(|x| x.desired_y.is_some())
             .collect();
         spaced_layout::layout(&mut has_desired);
-
-        for item in self.items.iter() {
-            println!("Item actual-y = {:?}", item.actual_y)
-        }
 
         // --- Now place the items that don't have desired places, right below the rest ---
         let last_item_opt = self.items.iter()

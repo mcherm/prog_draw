@@ -53,7 +53,7 @@ pub fn layout<'a,T: Spaceable>(items: &'a mut Vec<&'a mut T>) {
 
 
 /// A helper inside layout().
-fn find_pair_to_merge<'a,T:Spaceable>(spans: &Vec<CompactSpan<'a,T>>) -> Option<(usize, usize)> {
+fn find_pair_to_merge<T:Spaceable>(spans: &Vec<CompactSpan<T>>) -> Option<(usize, usize)> {
     for i in 0..spans.len() {
         let span_1 = &spans[i];
         for j in (i+1)..spans.len() {
@@ -73,23 +73,25 @@ fn find_pair_to_merge<'a,T:Spaceable>(spans: &Vec<CompactSpan<'a,T>>) -> Option<
 /// vectors) because when it kept the mutable vectors itself I couldn't figure out
 /// how to pass them over when two were merged.
 struct CompactSpan<'a,T:Spaceable> {
-    // FIXME: Remove next
-    //items: Vec<&'a mut T>, // min length 1; all have desired_y; kept in order by position
-
     item_vec: &'a Vec<&'a mut T>,
     item_idxs: Vec<usize>,
+    desired_min: Coord,
+    desired_max: Coord,
+    min_extent: Coord,
 }
 
 
 impl<'a,T: Spaceable> CompactSpan<'a,T> {
     /// Create a new span. Must be from a single item that has a desired position
-    // FIXME: Old version; remove
-    // fn new(item: &'a mut T) -> Self {
-    //     CompactSpan{items: vec![item]}
-    // }
     fn new(item_vec: &'a Vec<&'a mut T>, idx: usize) -> Self {
         let item_idxs = vec![idx];
-        CompactSpan{item_vec, item_idxs}
+        let item = item_vec.get(idx).unwrap();
+        let desired_min = item.get_desired_loc();
+        let desired_max = item.get_desired_loc();
+        let min_extent = item_idxs.iter()
+            .map(|x| item_vec.get(*x).unwrap().get_extent())
+            .sum::<Coord>();
+        CompactSpan{item_vec, item_idxs, desired_min, desired_max, min_extent}
     }
 
     /// gets the item for a given index
@@ -97,44 +99,32 @@ impl<'a,T: Spaceable> CompactSpan<'a,T> {
         self.item_vec.get(*idx).unwrap()
     }
 
-    fn desired_min(&self) -> Coord {
-        self.item_idxs.iter()
-            .map(|x| self.get(x).get_desired_loc() + self.get(x).get_extent() / 2.0)
-            .min_by(|x, y| Coord::total_cmp(x, y)).unwrap()
-    }
-
-    fn desired_max(&self) -> Coord {
-        self.item_idxs.iter()
-            .map(|x| self.get(x).get_desired_loc() + self.get(x).get_extent() / 2.0)
-            .max_by(|x, y| Coord::total_cmp(x, y)).unwrap()
-    }
-
     fn desired_center(&self) -> Coord {
-        (self.desired_min() + self.desired_max()) / 2.0
-    }
-
-    fn min_extent(&self) -> Coord {
-        self.item_idxs.iter()
-            .map(|x| self.get(x).get_extent())
-            .sum::<Coord>()
+        (self.desired_min + self.desired_max) / 2.0
     }
 
     fn required_min(&self) -> Coord {
-        self.desired_center() - self.min_extent() / 2.0
+        self.desired_center() - self.min_extent / 2.0
     }
 
     fn required_max(&self) -> Coord {
-        self.desired_center() + self.min_extent() / 2.0
+        self.desired_center() + self.min_extent / 2.0
     }
 
     fn overlaps(&self, other: &CompactSpan<'a,T>) -> bool {
-        self.required_min() > other.required_max() ||
-            self.required_max() > other.required_min()
+        let answer = !(
+            self.required_min() > other.required_max() ||
+            self.required_max() < other.required_min()
+        );
+        answer
     }
 
     /// Modifies self to be the merge of other and self
     fn merge(&mut self, other: CompactSpan<'a,T>) {
         self.item_idxs.extend(other.item_idxs);
+        self.desired_min = self.desired_min.min(other.desired_min);
+        self.desired_max = self.desired_max.max(other.desired_max);
+        self.min_extent = self.min_extent + other.min_extent;
     }
 
     /// Returns a vector telling where to position the items. We can't actually move
@@ -163,5 +153,46 @@ impl<'a,T: Spaceable> CompactSpan<'a,T> {
 
         // --- return ---
         answer
+    }
+}
+
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+    struct Dummy {
+        desired: Coord,
+        actual: Coord,
+    }
+
+    impl Dummy {
+        fn new(desired: &Coord) -> Self { Dummy{desired: *desired, actual: Coord::NAN} }
+    }
+
+    impl Spaceable for Dummy {
+        fn get_desired_loc(&self) -> Coord { self.desired }
+        fn get_extent(&self) -> Coord { 10.0 }
+        fn set_position(&mut self, pos: Coord) { self.actual = pos }
+    }
+
+    fn run_test(input: Vec<Coord>, expect: Vec<Coord>) {
+        let mut orig_items: Vec<Dummy> = input.iter().map(|x| Dummy::new(x)).collect();
+        let mut items: Vec<&mut Dummy> = orig_items.iter_mut().map(|x| x).collect();
+        layout(&mut items);
+        let output = orig_items.iter().map(|x| x.actual).collect_vec();
+        let expected = expect.iter().map(|x| *x).collect_vec();
+        assert_eq!(output, expected);
+    }
+
+
+    #[test]
+    fn test_two_overlapping() {
+        run_test(
+            vec![4.0, -4.0],
+            vec![5.0, -5.0]
+        );
     }
 }
