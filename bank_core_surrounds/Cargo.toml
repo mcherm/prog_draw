@@ -19,3 +19,4 @@ wasm-bindgen = "0.2" # for WASM integration
 prog_draw = {version = "0.1.2", path = "../prog_draw_rust"}
 calamine = "0.18.0" # to read excel files
 serde = {version = "1.0.145", features = ["derive"]}  # to read excel files
+once_cell = "1.15.0" # for keeping the global variable

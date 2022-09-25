@@ -11,8 +11,8 @@ mod connecting_lines;
 
 
 
-use std::sync::{Mutex, Once};
-use std::borrow::BorrowMut;
+use std::sync::Mutex;
+use once_cell::sync::Lazy;
 use document::TwoTreeViewDocument;
 use prog_draw::text_size;
 use wasm_bindgen::prelude::*;
@@ -25,6 +25,12 @@ extern {
     pub fn get_text_width(s: &str, font: &str) -> f32;
     pub fn get_text_height(s: &str, font: &str) -> f32;
 }
+
+/// The document we are displaying (and modifying on each update call) exists as a global variable.
+static GLOBAL_DOCUMENT: Lazy<Mutex<TwoTreeViewDocument>> = Lazy::new(|| {
+    Mutex::new(get_initial_document())
+});
+
 
 #[derive(Debug)]
 pub struct FontError;
@@ -58,7 +64,7 @@ pub fn get_style() -> String {
 
 #[wasm_bindgen]
 pub fn get_svg() -> String {
-    match global_document().lock().unwrap().get_svg_str() {
+    match GLOBAL_DOCUMENT.lock().unwrap().get_svg_str() {
         Ok(s) => s.into(),
         Err(_) => "<h1>Error</h1>".into(),
     }
@@ -66,14 +72,14 @@ pub fn get_svg() -> String {
 
 #[wasm_bindgen]
 pub fn toggle_node(node_id: String) -> String {
-    global_document().lock().unwrap().toggle_collapse(node_id.as_str());
+    GLOBAL_DOCUMENT.lock().unwrap().toggle_collapse(node_id.as_str());
     get_svg()
 }
 
 #[wasm_bindgen]
 pub fn show_node(node_id: String) -> String {
     capability_html::as_html(
-        global_document().lock().unwrap().get_node_data(&node_id).unwrap()
+        GLOBAL_DOCUMENT.lock().unwrap().get_node_data(&node_id).unwrap()
     )
 }
 
@@ -88,28 +94,3 @@ pub fn get_initial_document() -> TwoTreeViewDocument {
     // --- Create the document ---
     TwoTreeViewDocument::new(capdb)
 }
-
-
-
-static mut GLOBAL_DOCUMENT: Option<Mutex<TwoTreeViewDocument>> = None;
-static INIT_GLOBAL_DOCUMENT: Once = Once::new();
-
-
-fn global_document<'a>() -> &'a Mutex<TwoTreeViewDocument> {
-    INIT_GLOBAL_DOCUMENT.call_once(||{
-        // This is safe; see https://www.sitepoint.com/rust-global-variables/#multithreadedglobalswithruntimeinitialization
-        unsafe {
-            *GLOBAL_DOCUMENT.borrow_mut() = Some(Mutex::new(get_initial_document()))
-        }
-    });
-    unsafe { GLOBAL_DOCUMENT.as_ref().unwrap() }
-}
-
-//
-// FIXME:
-//   Folks on the Rust discord who helped me with another issue suggested that instead of doing
-//   GLOBAL_DOCUMENT as a "static mut" I should use either once_cell::sync::Lazy or else
-//   use "static GLOBAL_DOCUMENT: Mutex<Option<TwoTreeViewDocument>> = Mutex::new(None)"
-//   |
-//   I should try it
-//
