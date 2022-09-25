@@ -14,14 +14,16 @@ use crate::document::{BASELINE_RISE, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
 #[derive(Debug)]
 pub struct SurroundItem {
     data: SurroundRow,
-    location: Point,
     text_size: Point,
     used_by_set: UsedBySet,
+    desired_y: Option<Coord>,
+    actual_y: Option<Coord>,
 }
 
 #[derive(Debug)]
 pub struct SurroundItems {
     items: Vec<SurroundItem>,
+    x_position: Coord,
 }
 
 
@@ -37,7 +39,8 @@ fn get_text_size(text: &str) -> Point {
 impl SurroundItem {
     pub fn new(data: &SurroundRow) -> Self {
         let data = data.clone();
-        let location = Default::default();
+        let desired_y = None;
+        let actual_y = None;
         let text_size = get_text_size(&data.name);
         fn to_used_by(b: bool) -> UsedBy {
             match b {
@@ -50,7 +53,7 @@ impl SurroundItem {
             to_used_by(data.sbb_destination),
             to_used_by(data.commercial_destination)
         );
-        Self{data, location, text_size, used_by_set}
+        Self{data, text_size, used_by_set, desired_y, actual_y}
     }
 
     /// Returns the (should be unique) ID for this surround.
@@ -61,7 +64,7 @@ impl SurroundItem {
     /// Provide a new preferred y location for this node. The position is requested, but
     /// there might be crowding.
     pub fn reposition(&mut self, y_loc: Coord) {
-        self.location.1 = y_loc;
+        self.desired_y = Some(y_loc);
     }
 }
 
@@ -73,7 +76,8 @@ impl SurroundItems {
             .filter(|x| x.name.as_str() != "Destination Core") // suppress this one in particular
             .map(|x| SurroundItem::new(x))
             .collect();
-        SurroundItems{items}
+        let x_position = 0.0;
+        SurroundItems{items, x_position}
     }
 
     /// Given the name of a surround, this returns the SurroundItem (or None if it
@@ -97,10 +101,28 @@ impl SurroundItems {
     }
 
 
-    /// sets all the nodes to a new X position.
-    pub fn set_x_position(&mut self, x_pos: Coord) {
+    /// Calling this clears away all information about where individual items are placed.
+    /// After doing so (and before rendering) calls will be made to re-position things.
+    /// This call provides the first piece of information: the new x_position.
+    pub fn reset_positions(&mut self, x_pos: Coord) {
+        self.x_position = x_pos;
         for item in self.items.iter_mut() {
-            item.location.0 = x_pos;
+            item.desired_y = None;
+            item.actual_y = None;
+        }
+    }
+
+
+    /// This is called after some (not necessarily all) of the individual items have been
+    /// given desired y positions using the reposition() call. It goes through the entire
+    /// collection and determines actual positions such that the items won't overlap.
+    pub fn distribute_space(&mut self) {
+        // FIXME: Need clever algorithm -- which I've thought of!
+        for item in self.items.iter_mut() {
+            item.actual_y = match item.desired_y {
+                Some(y) => Some(y),
+                None => Some(0.0),
+            };
         }
     }
 }
@@ -109,7 +131,8 @@ impl SurroundItems {
 impl Renderable for SurroundItem {
     fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
         // --- Decide the dimensions of everything ---
-        let (loc_x, loc_y) = self.location;
+        let loc_x = 0.0; // the parent provides the x positioning
+        let loc_y = self.actual_y.expect("Must position items before rendering.");
         let (text_width, text_height) = self.text_size;
         let text_left = loc_x + TEXT_ITEM_PADDING;
         let text_top = loc_y - text_height / 2.0;
@@ -155,25 +178,30 @@ impl Renderable for SurroundItem {
 
 
 impl SvgPositioned for SurroundItem {
-    // Gives the bounding box for the node including text AND the box around it. Remember, if
-    // the node isn't correctly positioned yet, its location will be (0,0). Also know that
-    // self.location is the center-left of the box it occupies.
+    // Gives the bounding box for the node including text AND the box around it. Calling
+    // this when the node hasn't been correctly positioned will result in a panic. Because
+    // the parent takes care of x-positioning, this box will always have its left edge
+    // at zero.
     fn get_bbox(&self) -> Rect {
-        let center = self.location;
+        let left = 0.0;
+        let center = self.actual_y.expect("Must position items before getting bbox.");
         let (text_width, text_height) = self.text_size;
         let width = text_width + 2.0 * TEXT_ITEM_PADDING;
         let height = text_height + 2.0 * TEXT_ITEM_PADDING;
-        let left = center.0;
-        let top = center.1 - height / 2.0;
+        let top = center - height / 2.0;
         Rect::new_ltwh(left, top, width, height)
     }
 }
 
 impl Renderable for SurroundItems {
     fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
+        tag_writer.begin_tag("g", Attributes::from([
+            ("transform", format!("translate({}, 0.0)", self.x_position))
+        ]))?;
         for item in self.items.iter() {
             item.render(tag_writer)?;
         }
+        tag_writer.end_tag("g")?;
         Ok(())
     }
 }
@@ -184,5 +212,6 @@ impl SvgPositioned for SurroundItems {
             .map(|x| x.get_bbox())
             .reduce(|r1, r2| r1.cover(&r2))
             .unwrap() // panic if there are NO items in the SurroundItems
+            .translated(self.x_position, 0.0)
     }
 }

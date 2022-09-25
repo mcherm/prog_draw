@@ -281,10 +281,11 @@ impl TwoTreeViewDocument {
         }
 
         // Now move the actual surrounds
-        self.surrounds.set_x_position(surround_x);
+        self.surrounds.reset_positions(surround_x);
         for (id, pos) in desired_surround_positions.iter() {
             self.surrounds.get_by_id_mut(id.as_str()).unwrap().reposition(*pos);
         }
+        self.surrounds.distribute_space();
 
         // Now that we're done, restore the tree direction
         LAYOUT_DIRECTION.with(|it| it.set(existing_direction));
