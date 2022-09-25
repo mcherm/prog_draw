@@ -7,6 +7,7 @@ mod document;
 mod capability_html;
 mod surrounds;
 mod connecting_lines;
+mod spaced_layout;
 
 
 use calamine::Error;
@@ -28,7 +29,8 @@ fn main() -> Result<(), Error> {
         Ok(capdb) => capdb,
         Err(err) => panic!("{}", err), // it's read at compile time, so handle errors with a panic.
     };
-    let document = document::TwoTreeViewDocument::new(capdb);
+    let mut document = document::TwoTreeViewDocument::new(capdb);
+    document.toggle_collapse("BC2");
     let _ = document.get_svg_str();
 
     // --- print it ---

@@ -3,11 +3,9 @@
 // implement it. This module creates one.
 //
 
-use prog_draw::data_tree::DTNode;
 use prog_draw::geometry::{Coord, Point, Rect};
 use prog_draw::svg_render::SvgPositioned;
 use prog_draw::svg_writer::{Renderable, TagWriter, TagWriterError, Attributes};
-use crate::capability_tree::CapabilityData;
 use crate::used_by::{get_color_strs, UsedBySet};
 use crate::document::CONNECT_DOT_RADIUS;
 
@@ -44,9 +42,8 @@ impl ConnectingLines {
 
     /// Call this to add in a new line. It's promised that we're in a mode where we can safely
     /// get bbox data for the DTNode.
-    pub fn add_line(&mut self, cap_node: &DTNode<CapabilityData>, surround_pos: Point, used_by_set: &UsedBySet) {
-        let cap_bbox = cap_node.get_bbox();
-        let start: Point = (cap_bbox.right(), cap_bbox.center_y());
+    pub fn add_line(&mut self, capability_pos: Point, surround_pos: Point, used_by_set: &UsedBySet) {
+        let start = capability_pos;
         let end = surround_pos;
         let color = get_color_strs(&used_by_set).0;
         let line: Line = Line{start, end, color};

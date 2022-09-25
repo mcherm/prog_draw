@@ -207,10 +207,13 @@ impl TwoTreeViewDocument {
         let existing_direction = LAYOUT_DIRECTION.with(|it| it.get());
         LAYOUT_DIRECTION.with(|it| it.set(Some(TreeLayoutDirection::Right)));
 
-        // This is the list of (requirement, surround) pairs. We'll use it for layout,
+        // This is the list of connections from capabilities to surrounds. We'll use it for layout,
         // then for making lines.
-        // FIXME: Can probably just store the LOCATION of the DTNode. Which would be better
-        struct Connection<'a>(&'a DTNode<CapabilityData>, &'a str, UsedBySet);
+        struct Connection {
+            capability_pos: Point,
+            surround_id: String,
+            used_by_set: UsedBySet
+        }
 
         let mut connections: Vec<Connection> = Vec::new();
 
@@ -228,7 +231,10 @@ impl TwoTreeViewDocument {
                             println!("Could not find a surround named '{}' which is mentioned in {}. Skipped.", surround_name, node.data.id);
                         },
                         Some(surround_item) => {
-                            connections.push(Connection(node, surround_item.id(), used_by_set));
+                            let capability_bbox = node.get_bbox();
+                            let capability_pos: Point = (capability_bbox.right(), capability_bbox.center_y());
+                            let surround_id = surround_item.id().to_string();
+                            connections.push(Connection{capability_pos, surround_id, used_by_set});
                         }
                     }
                 }
@@ -241,21 +247,17 @@ impl TwoTreeViewDocument {
         }
 
         // Now that we have connections, we can find the list of connections for each unique surround
-        let mut connections_by_surround_name: HashMap<&str, Vec<&Connection>> = HashMap::new();
+        let mut connections_by_surround_name: HashMap<&String, Vec<&Connection>> = HashMap::new();
         for connection in connections.iter() {
-            let id = connection.1;
-            match connections_by_surround_name.get_mut(id) {
+            match connections_by_surround_name.get_mut(&connection.surround_id) {
                 None => { // new surround
-                    connections_by_surround_name.insert(id, vec![connection]);
+                    connections_by_surround_name.insert(&connection.surround_id, vec![connection]);
                 }
                 Some(connection_list) => { // existing surround
                     connection_list.push(connection);
                 }
             }
         }
-
-        // Decide where to position the surrounds in the x direction
-        let surround_x = self.surround_tree.get_bbox().right() + SPACING_TO_SURROUNDS;
 
         // Now we can position each surround vertically
         let mut desired_surround_positions: HashMap<String, Coord> = HashMap::new();
@@ -264,21 +266,14 @@ impl TwoTreeViewDocument {
 
             // Average the things it's connected to to find a y value
             let sum_of_y_values: Coord = connection_list.iter()
-                .map(|connection| {
-                    // FIXME: Getting the bbox to find the position is wasteful; we used that to build the bbox!
-                    connection.0.data.get_bbox().center_y()
-                })
+                .map(|connection| connection.capability_pos.1)
                 .sum();
             let average_y = sum_of_y_values / (connection_list.len() as Coord);
             desired_surround_positions.insert(id.to_string(), average_y);
         }
 
-        // Now create the actual lines
-        self.connecting_lines.clear();
-        for connection in connections.iter() {
-            let surround_y = *desired_surround_positions.get(connection.1).unwrap();
-            self.connecting_lines.add_line(connection.0, (surround_x, surround_y), &connection.2);
-        }
+        // Decide where to position the surrounds in the x direction
+        let surround_x = self.surround_tree.get_bbox().right() + SPACING_TO_SURROUNDS;
 
         // Now move the actual surrounds
         self.surrounds.reset_positions(surround_x);
@@ -286,6 +281,13 @@ impl TwoTreeViewDocument {
             self.surrounds.get_by_id_mut(id.as_str()).unwrap().reposition(*pos);
         }
         self.surrounds.distribute_space();
+
+        // Now create the actual lines
+        self.connecting_lines.clear();
+        for connection in connections.iter() {
+            let surround_y = self.surrounds.get_by_id_mut(&connection.surround_id).unwrap().get_actual_y().unwrap();
+            self.connecting_lines.add_line(connection.capability_pos, (surround_x, surround_y), &connection.used_by_set);
+        }
 
         // Now that we're done, restore the tree direction
         LAYOUT_DIRECTION.with(|it| it.set(existing_direction));

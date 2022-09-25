@@ -8,7 +8,9 @@ use prog_draw::text_size::get_system_text_sizer;
 use prog_draw::svg_writer::{Attributes, Renderable, TagWriter, TagWriterError};
 use crate::capability_db::{CapabilitiesDB, SurroundRow};
 use crate::used_by::{get_color_strs, UsedBy, UsedBySet};
-use crate::document::{BASELINE_RISE, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING};
+use crate::document::{BASELINE_RISE, NODE_ITEM_ROUND_CORNER, TEXT_ITEM_PADDING, ITEM_SPACING};
+use crate::spaced_layout;
+use crate::spaced_layout::Spaceable;
 
 
 #[derive(Debug)]
@@ -66,6 +68,26 @@ impl SurroundItem {
     pub fn reposition(&mut self, y_loc: Coord) {
         self.desired_y = Some(y_loc);
     }
+
+    /// Returns the actual y coordinate
+    pub fn get_actual_y(&self) -> Option<Coord> {
+        self.actual_y
+    }
+}
+
+impl spaced_layout::Spaceable for SurroundItem {
+    fn get_desired_loc(&self) -> Coord {
+        self.desired_y.unwrap() // NOTE: Panics if used on one without a desired position
+    }
+
+    fn get_extent(&self) -> Coord {
+        let (_, text_height) = self.text_size;
+        text_height + 2.0 * TEXT_ITEM_PADDING + ITEM_SPACING
+    }
+
+    fn set_position(&mut self, pos: Coord) {
+        self.actual_y = Some(pos);
+    }
 }
 
 
@@ -117,12 +139,29 @@ impl SurroundItems {
     /// given desired y positions using the reposition() call. It goes through the entire
     /// collection and determines actual positions such that the items won't overlap.
     pub fn distribute_space(&mut self) {
-        // FIXME: Need clever algorithm -- which I've thought of!
-        for item in self.items.iter_mut() {
-            item.actual_y = match item.desired_y {
-                Some(y) => Some(y),
-                None => Some(0.0),
-            };
+        println!("Calling distribute_space()"); // FIXME: Remove
+        let mut has_desired: Vec<&mut SurroundItem> = self.items.iter_mut()
+            .filter(|x| x.desired_y.is_some())
+            .collect();
+        spaced_layout::layout(&mut has_desired);
+
+        for item in self.items.iter() {
+            println!("Item actual-y = {:?}", item.actual_y)
+        }
+
+        // --- Now place the items that don't have desired places, right below the rest ---
+        let last_item_opt = self.items.iter()
+            .filter(|x| x.actual_y.is_some())
+            .max_by(|x,y| x.actual_y.unwrap().total_cmp(&y.actual_y.unwrap()));
+        let mut pos = match last_item_opt {
+            None => 0.0, // FIXME: Should it be centered instead of starting in the middle?
+            Some(last_item) => last_item.actual_y.unwrap() + last_item.get_extent() / 2.0,
+        };
+        for item in self.items.iter_mut().filter(|x| x.desired_y.is_none()) {
+            let item_extent = item.get_extent();
+            let item_pos = pos + item_extent / 2.0;
+            item.actual_y = Some(item_pos);
+            pos += item.get_extent();
         }
     }
 }
