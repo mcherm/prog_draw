@@ -179,8 +179,22 @@ impl Renderable for SurroundItem {
 
         // --- decide on decoration & color ---
         let (box_color, text_color) = get_color_strs(&self.used_by_set);
+        let is_new = self.data.is_new_system;
 
         // --- draw it ---
+        if is_new {
+            const RING_DIST: Coord = 2.5;
+            tag_writer.single_tag("rect", Attributes::from([
+                ("x", &*(box_left - RING_DIST).to_string()),
+                ("y", &*(box_top - RING_DIST).to_string()),
+                ("width", &*(box_width + 2.0 * RING_DIST).to_string()),
+                ("height", &*(box_height + 2.0 * RING_DIST).to_string()),
+                ("rx", &*(NODE_ITEM_ROUND_CORNER + RING_DIST).to_string()),
+                ("fill", "#FFFFFF"),
+                ("stroke", "black"),
+                ("stroke-width", &*1.to_string()),
+            ]))?;
+        }
         tag_writer.single_tag("rect", Attributes::from([
             ("x", &*box_left.to_string()),
             ("y", &*box_top.to_string()),
