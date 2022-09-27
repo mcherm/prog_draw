@@ -89,12 +89,12 @@ pub fn get_color_strs(used_by_set: &UsedBySet) ->  (&'static str, &'static str) 
         });
         match bools {
             [ true,  true,  true] => ("#804000", "#FFFFFF"),
-            [ true,  true, false] => ("#F58CFF", "#000000"),
+            [ true,  true, false] => ("#80FF80", "#000000"),
             [ true, false,  true] => ("#FFC77F", "#000000"),
-            [ true, false, false] => ("#FF6163", "#000000"),
-            [false,  true,  true] => ("#80FF80", "#000000"),
-            [false,  true, false] => ("#7F7FFF", "#000000"),
-            [false, false,  true] => ("#FFFF7F", "#000000"),
+            [ true, false, false] => ("#FFFF7F", "#000000"),
+            [false,  true,  true] => ("#F58CFF", "#000000"),
+            [false,  true, false] => ("#8080FF", "#000000"),
+            [false, false,  true] => ("#FF6163", "#000000"),
             [false, false, false] => ("#FFFFFF", "#000000"),
         }
     }
