@@ -33,15 +33,15 @@
             // For both of those, "12.4px Arial" is an example of a font value.
 
 
-            import init, {initialize, get_style, get_svg, toggle_node, refold, show_node} from "./pkg/bank_core_surrounds.js";
+            import init, {initialize, get_style, get_svg, toggle_node, refold, show_overlay} from "./pkg/bank_core_surrounds.js";
             window.toggle_then_draw = function(id) {
                 document.getElementById("svg_container").innerHTML = toggle_node(id);
             };
             window.refold = function(named_fold) {
                 document.getElementById("svg_container").innerHTML = refold(named_fold);
             }
-            window.show_node_data = function(id) {
-                document.getElementById("modal_parent").innerHTML = show_node(id);
+            window.show_overlay_data = function(data_type, item_id) {
+                document.getElementById("modal_parent").innerHTML = show_overlay(data_type, item_id);
             }
             init()
                 .then(() => {

@@ -15,7 +15,7 @@ use crate::spaced_layout::Spaceable;
 
 #[derive(Debug)]
 pub struct SurroundItem {
-    data: SurroundRow,
+    pub data: SurroundRow,
     text_size: Point,
     used_by_set: UsedBySet,
     desired_y: Option<Coord>,
@@ -113,6 +113,15 @@ impl SurroundItems {
         return None
     }
 
+    pub fn get_by_id(&self, id: &str) -> Option<&SurroundItem> {
+        for item in self.items.iter() {
+            if item.data.id.as_str() == id {
+                return Some(item)
+            }
+        }
+        return None
+    }
+
     pub fn get_by_id_mut(&mut self, id: &str) -> Option<&mut SurroundItem> {
         for item in self.items.iter_mut() {
             if item.data.id.as_str() == id {
@@ -204,7 +213,7 @@ impl Renderable for SurroundItem {
             ("fill", box_color),
             ("stroke", "black"),
             ("stroke-width", &*1.to_string()),
-            ("onclick", &format!("show_surround_data('{}')", self.data.id)),
+            ("onclick", &format!("show_overlay_data('surround','{}')", self.data.id)),
             ("class", "surround")
         ]))?;
         tag_writer.tag_with_text(

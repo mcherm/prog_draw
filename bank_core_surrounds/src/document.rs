@@ -13,7 +13,7 @@ use crate::trifoil;
 use crate::capability_db::CapabilitiesDB;
 use crate::capability_tree::{CapabilityData, CapabilityNodeTree, read_trees_from_capdb};
 use crate::center_dot::CenterDot;
-use crate::surrounds::SurroundItems;
+use crate::surrounds::{SurroundItem, SurroundItems};
 use crate::connecting_lines::ConnectingLines;
 use crate::used_by::UsedBySet;
 
@@ -89,13 +89,17 @@ impl TwoTreeViewDocument {
     }
 
     /// Returns the CapabilityData with that node_id if it exists; None if not.
-    #[allow(dead_code)] // this IS used, but from javascript
     pub fn get_node_data(&self, id: &str) -> Option<&CapabilityData> {
         // NOTE: The tricky bit is that it could be in either tree (and we don't care which it's in)
         match self.core_tree.find_data_by_id(id) {
             Some(data) => Some(data),
             None => self.surround_tree.find_data_by_id(id),
         }
+    }
+
+    /// Returns the SurroundRow with that surround_id if it exists; None if not.
+    pub fn get_surround(&self, id: &str) -> Option<&SurroundItem> {
+        self.surrounds.get_by_id(id)
     }
 
     pub fn output_to(&self, output: &mut dyn std::io::Write) -> Result<(),TagWriterError> {

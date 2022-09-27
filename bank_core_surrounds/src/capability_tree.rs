@@ -217,7 +217,7 @@ impl Renderable for CapabilityData {
                 ("fill", box_color),
                 ("stroke", "black"),
                 ("stroke-width", &*1.to_string()),
-                ("onclick", &format!("show_node_data('{}')", self.id)),
+                ("onclick", &format!("show_overlay_data('capability','{}')", self.id)),
                 ("class", class)
             ]))?;
             tag_writer.tag_with_text(

@@ -91,6 +91,10 @@ pub struct SurroundRow {
     pub sbb_destination: bool,
     #[serde(rename(deserialize = "CommercialDestination"), deserialize_with = "deserialize_yes_no")]
     pub commercial_destination: bool,
+    #[serde(default, rename(deserialize = "AppOnMainframe"))]
+    pub app_on_mainframe: String,
+    #[serde(default, rename(deserialize = "Links"))]
+    pub links: String,
 }
 
 #[derive(Debug)]

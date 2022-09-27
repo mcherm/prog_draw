@@ -78,10 +78,8 @@ pub fn toggle_node(node_id: String) -> String {
 }
 
 #[wasm_bindgen]
-pub fn show_node(node_id: String) -> String {
-    capability_html::as_html(
-        GLOBAL_DOCUMENT.lock().unwrap().get_node_data(&node_id).unwrap()
-    )
+pub fn show_overlay(data_type: String, item_id: String) -> String {
+    capability_html::show_overlay(GLOBAL_DOCUMENT.lock().unwrap(), data_type, item_id)
 }
 
 /// This adjusts the collapse settings to one of the known, named states.
