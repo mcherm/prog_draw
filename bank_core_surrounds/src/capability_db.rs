@@ -240,6 +240,10 @@ impl CapabilitiesDB {
             .collect()
     }
 
+    pub fn get_ssr_by_id(&self, ssr_id: &str) -> Option<&SurroundSheetRow> {
+        self.surround_sheet_rows.iter().filter(|x| x.id == ssr_id).nth(0)
+    }
+
 
     /// This finds the surrounds that are expected to implement a given capability. It is passed
     /// the ID for a capability; it uses the data to find surrounds that are expected to implement
@@ -247,11 +251,17 @@ impl CapabilitiesDB {
     /// containing only YES and NO values (at least one of which should be YES) to indicate
     /// WHICH divisions are using that surround.
     pub fn get_related_surrounds<'a>(&'a self, cap_id: &str) -> Vec<(&'a str, UsedBySet)> {
-        // --- First, find the SSR (if any) ---
+        // --- First, find the list of SSRs (if any) ---
+        let mut ssr_ids: Vec<&str> = Vec::new();
         let cap = self.get_capability_by_id(cap_id).expect("Capability ID was invalid.");
-        let mut ssrid_opt: Option<&str> = match &cap.ssr_id {None => None, Some(x) => Some(&x)};
+        let ssrid_opt: Option<&str> = match &cap.ssr_id {None => None, Some(x) => Some(&x)};
         loop {
             match ssrid_opt {
+                Some("CORE") => {
+                }
+                None | Some("") => {
+                    break;
+                },
                 Some("*") => {
                     let mut ancestor_cap: &CapabilitiesRow = cap; // start with self
                     loop {
@@ -262,57 +272,52 @@ impl CapabilitiesDB {
                             Some("*") => continue,
                             Some("CORE") | Some("^") | Some("") | None => panic!("Node with * for ssr_id has no ancestor with a value."),
                             Some(ssr_id) => {
-                                ssrid_opt = Some(ssr_id); // We found the right ancestor ssr_id to use
+                                ssr_ids.push(ssr_id); // We found the right ancestor ssr_id to use
                                 break;
                             }
                         }
                     }
                     continue;
                 },
-                Some("CORE") => {
-                    ssrid_opt = None;
-                }
                 Some("^") => {
-                    todo!();
+                    for child_id in self.get_child_capability_ids_by_id(cap_id) {
+                        self.get_related_surrounds(&child_id).iter()
+                            .for_each(|x| ssr_ids.push(x.0));
+                    }
                 }
-                None | Some("") => {
-                    ssrid_opt = None;
+                Some(ssr_id) => {
+                    ssr_ids.push(ssr_id);
                     break;
                 },
-                Some(_) => break,
             }
         }
 
-        // --- Handle case where there's no SSR_ID ---
-        let ssr_id = match ssrid_opt {
-            None => return Vec::default(), // no SSR_ID means no surrounds use this; we're done
-            Some(ssr_id) => ssr_id,
-        };
-
         // --- Find the destination systems for that SSR_ID ---
         let mut answer: Vec<(&'a str, UsedBySet)> = Vec::new();
-        let ssr_row = self.surround_sheet_rows.iter().filter(|x| x.id == ssr_id).nth(0).expect("SSRID is invalid.");
-        let mut unique_names: HashSet<&str> = HashSet::new();
-        unique_names.extend(ssr_row.consumer_destination.names.iter().map(|x| x.as_str()));
-        unique_names.extend(ssr_row.sbb_destination.names.iter().map(|x| x.as_str()));
-        unique_names.extend(ssr_row.commercial_destination.names.iter().map(|x| x.as_str()));
-        for surround_name in unique_names {
-            if NOT_REALLY_SURROUNDS.contains(&surround_name) {
-                continue; // skip these special names
-            }
-            fn ub(sl: &SurroundList, name: &str) -> UsedBy {
-                if sl.names.iter().any(|x| x.as_str() == name) {
-                    UsedBy::Yes
-                } else {
-                    UsedBy::No
+        for ssr_id in ssr_ids {
+            let ssr_row = self.get_ssr_by_id(ssr_id).expect("SSRID is invalid.");
+            let mut unique_names: HashSet<&str> = HashSet::new();
+            unique_names.extend(ssr_row.consumer_destination.names.iter().map(|x| x.as_str()));
+            unique_names.extend(ssr_row.sbb_destination.names.iter().map(|x| x.as_str()));
+            unique_names.extend(ssr_row.commercial_destination.names.iter().map(|x| x.as_str()));
+            for surround_name in unique_names {
+                if NOT_REALLY_SURROUNDS.contains(&surround_name) {
+                    continue; // skip these special names
                 }
+                fn ub(sl: &SurroundList, name: &str) -> UsedBy {
+                    if sl.names.iter().any(|x| x.as_str() == name) {
+                        UsedBy::Yes
+                    } else {
+                        UsedBy::No
+                    }
+                }
+                let used_by = UsedBySet::from_fields(
+                    ub(&ssr_row.consumer_destination, surround_name),
+                    ub(&ssr_row.sbb_destination, surround_name),
+                    ub(&ssr_row.commercial_destination, surround_name),
+                );
+                answer.push((surround_name, used_by))
             }
-            let used_by = UsedBySet::from_fields(
-                ub(&ssr_row.consumer_destination, surround_name),
-                ub(&ssr_row.sbb_destination, surround_name),
-                ub(&ssr_row.commercial_destination, surround_name),
-            );
-            answer.push((surround_name, used_by))
         }
         answer
     }
