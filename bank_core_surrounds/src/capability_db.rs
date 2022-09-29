@@ -255,41 +255,34 @@ impl CapabilitiesDB {
         let mut ssr_ids: Vec<&str> = Vec::new();
         let cap = self.get_capability_by_id(cap_id).expect("Capability ID was invalid.");
         let ssrid_opt: Option<&str> = match &cap.ssr_id {None => None, Some(x) => Some(&x)};
-        loop {
-            match ssrid_opt {
-                Some("CORE") => {
-                }
-                None | Some("") => {
-                    break;
-                },
-                Some("*") => {
-                    let mut ancestor_cap: &CapabilitiesRow = cap; // start with self
-                    loop {
-                        // move ancestor_cap to parent
-                        ancestor_cap = self.get_capability_by_id(&ancestor_cap.parent_id).expect("Parent capability invalid.");
-                        let ancestor_ssrid_opt: Option<&str> = match &ancestor_cap.ssr_id {None => None, Some(x) => Some(&x)};
-                        match ancestor_ssrid_opt {
-                            Some("*") => continue,
-                            Some("CORE") | Some("^") | Some("") | None => panic!("Node with * for ssr_id has no ancestor with a value."),
-                            Some(ssr_id) => {
-                                ssr_ids.push(ssr_id); // We found the right ancestor ssr_id to use
-                                break;
-                            }
+        match ssrid_opt {
+            Some("CORE") | Some("") | None => {
+            },
+            Some("*") => {
+                let mut ancestor_cap: &CapabilitiesRow = cap; // start with self
+                loop {
+                    // move ancestor_cap to parent
+                    ancestor_cap = self.get_capability_by_id(&ancestor_cap.parent_id).expect("Parent capability invalid.");
+                    let ancestor_ssrid_opt: Option<&str> = match &ancestor_cap.ssr_id {None => None, Some(x) => Some(&x)};
+                    match ancestor_ssrid_opt {
+                        Some("*") => continue,
+                        Some("CORE") | Some("^") | Some("") | None => panic!("Node with * for ssr_id has no ancestor with a value."),
+                        Some(ssr_id) => {
+                            ssr_ids.push(ssr_id); // We found the right ancestor ssr_id to use
+                            break;
                         }
                     }
-                    continue;
-                },
-                Some("^") => {
-                    for child_id in self.get_child_capability_ids_by_id(cap_id) {
-                        self.get_related_surrounds(&child_id).iter()
-                            .for_each(|x| ssr_ids.push(x.0));
-                    }
                 }
-                Some(ssr_id) => {
-                    ssr_ids.push(ssr_id);
-                    break;
-                },
+            },
+            Some("^") => {
+                for child_id in self.get_child_capability_ids_by_id(cap_id) {
+                    self.get_related_surrounds(&child_id).iter()
+                        .for_each(|x| ssr_ids.push(x.0));
+                }
             }
+            Some(ssr_id) => {
+                ssr_ids.push(ssr_id);
+            },
         }
 
         // --- Find the destination systems for that SSR_ID ---
