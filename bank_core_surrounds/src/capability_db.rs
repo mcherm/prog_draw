@@ -275,10 +275,23 @@ impl CapabilitiesDB {
                 }
             },
             Some("^") => {
-                for child_id in self.get_child_capability_ids_by_id(cap_id) {
-                    self.get_related_surrounds(&child_id).iter()
-                        .for_each(|x| ssr_ids.push(x.0));
+                fn collect_ssrids<'b>(capdb: &'b CapabilitiesDB, ssr_ids: &mut Vec<&'b str>, cap: &'b CapabilitiesRow) {
+                    let descendant_ssrid_opt: Option<&str> = match &cap.ssr_id {None=>None, Some(x) => Some(&x)};
+                    match descendant_ssrid_opt {
+                        Some("") | Some("*") | None => panic!("Node with ^ for ssr_id has descendant with \"\" or \"*\"."),
+                        Some("^") | Some("CORE") => {
+                            for child_id in capdb.get_child_capability_ids_by_id(&cap.id) {
+                                let child_cap = capdb.get_capability_by_id(&child_id).expect("Capability id not found.");
+                                collect_ssrids(capdb, ssr_ids, child_cap);
+                            }
+                        },
+                        Some(ssr_id) => {
+                            ssr_ids.push(ssr_id);
+                            // do not recurse below this
+                        },
+                    }
                 }
+                collect_ssrids(self, &mut ssr_ids, cap);
             }
             Some(ssr_id) => {
                 ssr_ids.push(ssr_id);

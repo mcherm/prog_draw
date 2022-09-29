@@ -30,6 +30,7 @@ fn main() -> Result<(), Error> {
         Err(err) => panic!("{}", err), // it's read at compile time, so handle errors with a panic.
     };
     let mut document = document::TwoTreeViewDocument::new(capdb);
+    document.refold("LEVEL_2");
     document.toggle_collapse("BC2");
     let _ = document.get_svg_str();
 
