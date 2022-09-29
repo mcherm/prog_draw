@@ -231,8 +231,10 @@ impl TwoTreeViewDocument {
                 for (surround_name, used_by_set) in self.capdb.get_related_surrounds(&node.data.id) {
                     match self.surrounds.get_by_name(surround_name) {
                         None => {
-                            // FIXME: A better way to report this might be nice; this mostly just ignores bad data
-                            println!("Could not find a surround named '{}' which is mentioned in {}. Skipped.", surround_name, node.data.id);
+                            if !surround_name.starts_with("TODO: ") {
+                                // FIXME: A better way to report this might be nice; this mostly just ignores bad data
+                                println!("Could not find a surround named '{}' which is mentioned in {}. Skipped.", surround_name, node.data.id);
+                            }
                         },
                         Some(surround_item) => {
                             let capability_bbox = node.get_bbox();

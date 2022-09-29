@@ -225,6 +225,22 @@ impl Default for SurroundList {
 
 impl CapabilitiesDB {
 
+    /// This is given a capability by ID and returns the row with that capability's data, or None
+    /// if there is no such capability id
+    pub fn get_capability_by_id(&self, cap_id: &str) -> Option<&CapabilitiesRow> {
+        self.capabilities.iter().filter(|x| x.id == cap_id).nth(0)
+    }
+
+    /// This is given a capability ID and returns a vector of the IDs of that capability's
+    /// immediate children.
+    pub fn get_child_capability_ids_by_id(&self, cap_id: &str) -> Vec<String> {
+        self.capabilities.iter()
+            .filter(|x| &x.parent_id == cap_id)
+            .map(|x| x.id.clone())
+            .collect()
+    }
+
+
     /// This finds the surrounds that are expected to implement a given capability. It is passed
     /// the ID for a capability; it uses the data to find surrounds that are expected to implement
     /// it, and it returns a vector of pairs, giving the name of the surround and a UsedBySet
@@ -232,17 +248,33 @@ impl CapabilitiesDB {
     /// WHICH divisions are using that surround.
     pub fn get_related_surrounds<'a>(&'a self, cap_id: &str) -> Vec<(&'a str, UsedBySet)> {
         // --- First, find the SSR (if any) ---
-        let mut cap = self.capabilities.iter().filter(|x| x.id == cap_id).nth(0).expect("Capability ID was invalid.");
+        let cap = self.get_capability_by_id(cap_id).expect("Capability ID was invalid.");
         let mut ssrid_opt: Option<&str> = match &cap.ssr_id {None => None, Some(x) => Some(&x)};
         loop {
             match ssrid_opt {
                 Some("*") => {
-                    let parent = self.capabilities.iter().filter(|x| x.id == cap.parent_id).nth(0).expect("Parent capability invalid.");
-                    assert!(parent.level == cap.level - 1);
-                    cap = parent;
-                    ssrid_opt = match &cap.ssr_id {None=> None, Some(x) => Some(&x)};
+                    let mut ancestor_cap: &CapabilitiesRow = cap; // start with self
+                    loop {
+                        // move ancestor_cap to parent
+                        ancestor_cap = self.get_capability_by_id(&ancestor_cap.parent_id).expect("Parent capability invalid.");
+                        let ancestor_ssrid_opt: Option<&str> = match &ancestor_cap.ssr_id {None => None, Some(x) => Some(&x)};
+                        match ancestor_ssrid_opt {
+                            Some("*") => continue,
+                            Some("CORE") | Some("^") | Some("") | None => panic!("Node with * for ssr_id has no ancestor with a value."),
+                            Some(ssr_id) => {
+                                ssrid_opt = Some(ssr_id); // We found the right ancestor ssr_id to use
+                                break;
+                            }
+                        }
+                    }
                     continue;
                 },
+                Some("CORE") => {
+                    ssrid_opt = None;
+                }
+                Some("^") => {
+                    todo!();
+                }
                 None | Some("") => {
                     ssrid_opt = None;
                     break;
