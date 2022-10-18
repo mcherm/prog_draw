@@ -44,6 +44,13 @@ impl Attributes {
         }
         Ok(())
     }
+
+    /// This consumes the Attributes but returns a new one with the additional key/value pair.
+    pub fn with_field<K: ToString, V: ToString>(mut self, key: K, value: V) -> Self {
+        // FIXME: Maybe I should check for duplicate keys
+        self.fields.push((key.to_string(), value.to_string()));
+        Attributes{fields: self.fields}
+    }
 }
 
 impl<K, V, const N: usize> From<[(K, V); N]> for Attributes

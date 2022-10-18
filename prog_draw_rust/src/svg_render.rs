@@ -1,6 +1,6 @@
-
 use crate::svg_writer::{Renderable, TagWriter, TagWriterError, Attributes};
-use crate::geometry::{Coord, Rect};
+use crate::geometry::{Coord, Point, Rect};
+use crate::text_size::get_system_text_sizer;
 
 
 /// A trait for anything whose SVG dimensions can be measured and used to lay it
@@ -43,6 +43,85 @@ impl SvgPositioned for BasicBox {
     }
 }
 
+
+pub struct Text {
+    text: String,
+    position: Point, // The center of the text
+    text_size_cached: Point,
+    font_family: Option<String>,
+    font_size: Option<String>,
+}
+
+const DEFAULT_FONT: &str = "Arial";
+const DEFAULT_SIZE: f32 = 12.0;
+const DEFAULT_COLOR: &str = "#000000";
+
+impl Text {
+    /// Construct a new Text, providing the text and the position.
+    pub fn new(text: &str, position: Point) -> Self {
+        let mut answer = Text{text: text.to_string(), position, text_size_cached: (0.0, 0.0), font_family: None, font_size: None};
+        answer.cache_text_size();
+        answer
+    }
+
+    /// Construct a new Text, providing the text, position, and styling. font_family and font_size are
+    /// css strings for their corresponding CSS fields.
+    pub fn new_styled(text: &str, position: Point, font_family: Option<String>, font_size: Option<String>) -> Self {
+        let mut answer = Text{text: text.to_string(), position, text_size_cached: (0.0, 0.0), font_family, font_size};
+        answer.cache_text_size();
+        answer
+    }
+
+    /// Internal function to find the value we will store in text_size_cached.
+    fn cache_text_size(&mut self) {
+        let font = match &self.font_family {
+            None => DEFAULT_FONT,
+            Some(s) => s.as_str(),
+        };
+        let size: f32 = match &self.font_size {
+            None => DEFAULT_SIZE,
+            Some(s) if s.ends_with("px") => {
+                let num_part = &s[..s.len() - 2];
+                match num_part.parse::<f32>() {
+                    Err(_) => DEFAULT_SIZE,
+                    Ok(size) => size,
+                }
+            },
+            Some(_) => DEFAULT_SIZE,
+        };
+        self.text_size_cached = match get_system_text_sizer().text_size(&self.text, font, size) {
+            Err(_) => panic!("Sizing isn't working."),
+            Ok((width,height)) => (width as Coord, height as Coord)
+        };
+    }
+}
+
+
+impl SvgPositioned for Text {
+    fn get_bbox(&self) -> Rect {
+        Rect::new_cwh(self.position, self.text_size_cached.0, self.text_size_cached.1)
+    }
+}
+
+impl Renderable for Text {
+    fn render(&self, tag_writer: &mut dyn TagWriter) -> Result<(), TagWriterError> {
+        let mut attributes = Attributes::from([
+            ("x", self.position.0.to_string().as_str()),
+            ("y", self.position.1.to_string().as_str()),
+            ("fill", DEFAULT_COLOR),
+            ("text-anchor", "middle"),
+            ("dominant-baseline", "central"),
+            // FIXME: Now that I've figured out how to align text properly, maybe I should use that in OTHER places.
+        ]);
+        if self.font_family.is_some() {
+            attributes = attributes.with_field("font-family", self.font_family.as_ref().unwrap());
+        }
+        if self.font_size.is_some() {
+            attributes = attributes.with_field("style", format!("font-size: {}", self.font_size.as_ref().unwrap()));
+        }
+        tag_writer.tag_with_text("text", attributes, &self.text)
+    }
+}
 
 
 pub struct Group<'a> {

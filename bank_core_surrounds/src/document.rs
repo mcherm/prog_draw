@@ -7,7 +7,7 @@ use prog_draw::data_tree::{DTNode, LAYOUT_DIRECTION, TreeLayoutDirection};
 use prog_draw::geometry::Coord;
 use prog_draw::svg_writer::Renderable;
 use prog_draw::svg_writer::{TagWriterImpl, TagWriter, TagWriterError};
-use prog_draw::svg_render::{Group, Svg, SvgPositioned};
+use prog_draw::svg_render::{Group, Svg, SvgPositioned, Text};
 use prog_draw::geometry::Point;
 use crate::trifoil;
 use crate::capability_db::CapabilitiesDB;
@@ -30,6 +30,7 @@ pub const SPACING_TO_SURROUNDS: Coord = 3.0 * LAYER_SPACING;
 pub const SVG_MARGIN: Coord = 4.0;
 pub const TRIFOIL_SCALE: Coord = 0.5;
 pub const TRIFOIL_MARGIN: Coord = 80.0;
+pub const TITLES_MARGIN: Coord = 30.0;
 
 
 
@@ -111,14 +112,20 @@ impl TwoTreeViewDocument {
         let surrounds_group = Group::item_transformed(&self.surrounds, Some((shift_dist, 0.0)), None);
         let connecting_lines_group = Group::item_transformed(&self.connecting_lines, Some((shift_dist, 0.0)), None);
         let trifoil_group = Group::item_transformed(&trifoil::Trifoil, Some(self.trifoil_position()), Some(TRIFOIL_SCALE));
+        let core_cap_label = self.make_label("Core Capabilities", &core_tree_group);
+        let surround_cap_label = self.make_label("Surround Capabilities", &surround_tree_group);
+        let surrounds_label = self.make_label("Surrounds", &surrounds_group);
 
-        let content: [&dyn SvgPositioned; 6] = [
+        let content: [&dyn SvgPositioned; 9] = [
             &trifoil_group,
             &connecting_lines_group,
             &core_tree_group,
             &surround_tree_group,
             &CenterDot,
             &surrounds_group,
+            &core_cap_label,
+            &surround_cap_label,
+            &surrounds_label,
         ];
         let svg = Svg::new(Group::from(content), SVG_MARGIN);
 
@@ -201,6 +208,18 @@ impl TwoTreeViewDocument {
             trifoil_bbox.left() - TRIFOIL_MARGIN
         };
         (x_position, y_position)
+    }
+
+
+    /// This creates a label with the given text appearing centered over the given target.
+    fn make_label(&self, text: &str, target: &dyn SvgPositioned) -> Text {
+        let bbox = target.get_bbox();
+        Text::new_styled(
+            text,
+            (bbox.center_x(), bbox.top() - TITLES_MARGIN),
+            Some("Arial".to_string()),
+            Some("28px".to_string())
+        )
     }
 
 
